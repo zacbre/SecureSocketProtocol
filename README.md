@@ -7,8 +7,9 @@ A network library designed to be secure.
 Secure connection which is hard to spoof
 A private key which is never being send over the Internet
 KeyFile support, use files as a extra encryption key like in TrueCrypt
-Authentication support by Username and Password, The password is Hashed 11x by SHA-256 and MD5
+Authentication support by Username and Password, The password is Hashed 11x by SHA-512 and MD5
 Header Trash - Add useless junk to the header to make it more difficult to get to the payload
+Plugin support
 
 
 Certificate support:

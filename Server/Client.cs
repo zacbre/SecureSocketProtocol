@@ -143,9 +143,7 @@ namespace Server
         {
             Console.WriteLine("Authenication, Username:" + Username + ", Password:" + Password);
 
-            //Dergan B3C7F0291729404E86233AE202B82CBC1EC8D47EEE87BCFA250C8B4A09022E20
-
-            if (Username == "Dergan" && Password == "E1E01968067C9AE14AF6F7C2A8B7046EC87AE73B1F02717B18A1AA96191C8816")
+            if (Username == "Dergan" && Password == "0215C4D7AC62DF61A7ACCAD0E4EDEFC0A2BD4C50D656DA8282069291A1F216977B9AD9D28FCD40B5DE787288E067873847B523A084C169883762F30A5F7EEF89")
                 return true;
 
             return false;
