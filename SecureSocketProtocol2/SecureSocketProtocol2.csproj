@@ -1,0 +1,195 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{158D26C2-6132-4285-B99A-B42383A10C3B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SecureSocketProtocol2</RootNamespace>
+    <AssemblyName>SecureSocketProtocol2</AssemblyName>
+    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="CertificateInfo.cs" />
+    <Compile Include="ClientProperties.cs" />
+    <Compile Include="Compressions\CacheStream.cs" />
+    <Compile Include="Compressions\LZ4\ILZ4Compressor.cs" />
+    <Compile Include="Compressions\LZ4\ILZ4Decompressor.cs" />
+    <Compile Include="Compressions\LZ4\LZ4.cs" />
+    <Compile Include="Compressions\LZ4\LZ4Compressor32.cs" />
+    <Compile Include="Compressions\LZ4\LZ4Compressor64.cs" />
+    <Compile Include="Compressions\LZ4\LZ4CompressorFactory.cs" />
+    <Compile Include="Compressions\LZ4\LZ4Decompressor32.cs" />
+    <Compile Include="Compressions\LZ4\LZ4Decompressor64.cs" />
+    <Compile Include="Compressions\LZ4\LZ4DecompressorFactory.cs" />
+    <Compile Include="Compressions\LZ4\LZ4Util.cs" />
+    <Compile Include="Compressions\LZMA\Common\CRC.cs" />
+    <Compile Include="Compressions\LZMA\Common\InBuffer.cs" />
+    <Compile Include="Compressions\LZMA\Common\OutBuffer.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZMA\LzmaBase.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZMA\LzmaDecoder.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZMA\LzmaEncoder.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZ\IMatchFinder.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZ\LzBinTree.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZ\LzInWindow.cs" />
+    <Compile Include="Compressions\LZMA\Compress\LZ\LzOutWindow.cs" />
+    <Compile Include="Compressions\LZMA\Compress\RangeCoder\RangeCoder.cs" />
+    <Compile Include="Compressions\LZMA\Compress\RangeCoder\RangeCoderBit.cs" />
+    <Compile Include="Compressions\LZMA\Compress\RangeCoder\RangeCoderBitTree.cs" />
+    <Compile Include="Compressions\LZMA\ICoder.cs" />
+    <Compile Include="Compressions\LZMA\LZMACompressor.cs" />
+    <Compile Include="Compressions\LzwCompression.cs" />
+    <Compile Include="Compressions\UnsafeQuickLZ.cs" />
+    <Compile Include="Compressions\SafeQuickLZ.cs" />
+    <Compile Include="Controls\ChartInfo.cs" />
+    <Compile Include="Controls\HSLColor.cs" />
+    <Compile Include="Controls\PerformanceChart.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\PerformanceChart.designer.cs">
+      <DependentUpon>PerformanceChart.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\uTorrentProgressBar.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\uTorrentProgressBar.Designer.cs">
+      <DependentUpon>uTorrentProgressBar.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Encryptions\AesEncryption.cs" />
+    <Compile Include="Encryptions\RSAEncryption.cs" />
+    <Compile Include="Encryptions\UnsafeXor.cs" />
+    <Compile Include="Encryptions\WopEncryption.cs" />
+    <Compile Include="Enums.cs" />
+    <Compile Include="Hashers\CRC32.cs" />
+    <Compile Include="Hashers\IHash.cs" />
+    <Compile Include="Hashers\MurmurHash2InlineBitConverter.cs" />
+    <Compile Include="Hashers\MurmurHash2Simple.cs" />
+    <Compile Include="Hashers\MurmurHash2UInt32Hack.cs" />
+    <Compile Include="Hashers\MurmurHash2Unsafe.cs" />
+    <Compile Include="Hashers\MurmurHash3.cs" />
+    <Compile Include="Hashers\SuperFastHashInlineBitConverter.cs" />
+    <Compile Include="Hashers\SuperFastHashSimple.cs" />
+    <Compile Include="Hashers\SuperFastHashUInt16Hack.cs" />
+    <Compile Include="Hashers\SuperFastHashUnsafe.cs" />
+    <Compile Include="Misc\AverageValue.cs" />
+    <Compile Include="Misc\BigInteger.cs" />
+    <Compile Include="Misc\Bit.cs" />
+    <Compile Include="Misc\CertInfo.cs" />
+    <Compile Include="Misc\DataShuffler.cs" />
+    <Compile Include="Misc\DiffieHellman.cs" />
+    <Compile Include="Misc\ProgressHelper.cs" />
+    <Compile Include="Misc\ExtentionAttribute.cs" />
+    <Compile Include="Misc\IClient.cs" />
+    <Compile Include="Misc\IProtection.cs" />
+    <Compile Include="Misc\RandomDecimal.cs" />
+    <Compile Include="Misc\TaskQueue.cs" />
+    <Compile Include="Misc\NativeMethods.cs" />
+    <Compile Include="Network\Connection.cs" />
+    <Compile Include="Network\DeepPacketInspection.cs" />
+    <Compile Include="Network\DPIRule.cs" />
+    <Compile Include="Network\HeaderInfo.cs" />
+    <Compile Include="Network\Messages\MessageCache.cs" />
+    <Compile Include="Network\Messages\MessageHandler.cs" />
+    <Compile Include="Network\Messages\MsgAuthenication.cs" />
+    <Compile Include="Network\Messages\MsgAuthenicationSuccess.cs" />
+    <Compile Include="Network\Messages\MsgChannelPayload.cs" />
+    <Compile Include="Network\Messages\MsgClientInfo.cs" />
+    <Compile Include="Network\Messages\MsgCloseChannel.cs" />
+    <Compile Include="Network\Messages\MsgDiffiehellman.cs" />
+    <Compile Include="Network\Messages\MsgDisconnected.cs" />
+    <Compile Include="Network\Messages\MsgGetPluginInfo.cs" />
+    <Compile Include="Network\Messages\MsgGetPluginInfoResponse.cs" />
+    <Compile Include="Network\Messages\MsgInitPlugin.cs" />
+    <Compile Include="Network\Messages\MsgKeepAlive.cs" />
+    <Compile Include="Network\Messages\MsgMessageSeed.cs" />
+    <Compile Include="Network\Messages\MsgPluginCount.cs" />
+    <Compile Include="Network\Messages\MsgOk.cs" />
+    <Compile Include="Network\Messages\MsgOpenChannel.cs" />
+    <Compile Include="Network\Messages\MsgOpenChannelResponse.cs" />
+    <Compile Include="Network\Messages\MsgReconnect.cs" />
+    <Compile Include="Network\Messages\MsgRsaPublicKey.cs" />
+    <Compile Include="Network\Messages\MsgServerEncryption.cs" />
+    <Compile Include="Network\Messages\MsgUdpValidation.cs" />
+    <Compile Include="Network\Messages\MsgValidation.cs" />
+    <Compile Include="Network\NetworkPayload.cs" />
+    <Compile Include="Network\NetworkPayloadWriter.cs" />
+    <Compile Include="Network\NetworkStream.cs" />
+    <Compile Include="Network\OptimizedNetworkStream.cs" />
+    <Compile Include="Network\PacketHeader.cs" />
+    <Compile Include="Network\PacketQueue.cs" />
+    <Compile Include="Network\Messages\IMessage.cs" />
+    <Compile Include="Network\PayloadReader.cs" />
+    <Compile Include="Network\PayloadWriter.cs" />
+    <Compile Include="Network\PrivateKeyHandler.cs" />
+    <Compile Include="Network\Protections\Cache\SmartCacheProtection.cs" />
+    <Compile Include="Network\Protections\Compression\GzipProtection.cs" />
+    <Compile Include="Network\Protections\Compression\LZ4Protection.cs" />
+    <Compile Include="Network\Protections\Compression\LZMAProtection.cs" />
+    <Compile Include="Network\Protections\Compression\QuickLzProtection.cs" />
+    <Compile Include="Network\Protections\Encryption\AesProtection.cs" />
+    <Compile Include="Network\Protections\Masks\PayloadMasker.cs" />
+    <Compile Include="Network\Protections\Encryption\UdpWopProtection.cs" />
+    <Compile Include="Network\Protections\Encryption\UnsafeXorProtection.cs" />
+    <Compile Include="Network\Protections\Encryption\TcpWopProtection.cs" />
+    <Compile Include="Network\Protections\Protection.cs" />
+    <Compile Include="Network\Request.cs" />
+    <Compile Include="Network\SmartCache.cs" />
+    <Compile Include="Network\SmartCacheInfo.cs" />
+    <Compile Include="Network\SmartSerializer.cs" />
+    <Compile Include="Network\SyncObject.cs" />
+    <Compile Include="Network\Channel.cs" />
+    <Compile Include="Plugin\IPlugin.cs" />
+    <Compile Include="Plugin\IPluginHook.cs" />
+    <Compile Include="Plugin\PluginRecvInfo.cs" />
+    <Compile Include="Plugin\PluginSystem.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ServerProperties.cs" />
+    <Compile Include="SocksProxy\ProxySettings.cs" />
+    <Compile Include="SocksProxy\Socks5.cs" />
+    <Compile Include="SocksProxy\Socks5ProxyClient.cs" />
+    <Compile Include="SSPClient.cs" />
+    <Compile Include="SSPServer.cs" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
