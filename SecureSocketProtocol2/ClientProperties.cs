@@ -35,7 +35,7 @@ namespace SecureSocketProtocol2
             this.Username = Username;
             this.KeyFiles = KeyFiles;
 
-            SHA256Managed sha = new SHA256Managed();
+            SHA512Managed sha = new SHA512Managed();
             MD5 md = MD5.Create();
             byte[] hashed = null;
 
