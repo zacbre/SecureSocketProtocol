@@ -539,7 +539,9 @@ namespace SecureSocketProtocol2
                     this.Token = mci.Token;
 
                     if (UseUdp)
+                    {
                         this.UdpHandshakeCode = mci.UdpHandshakeCode;
+                    }
                     return true;
                 }
                 return false;
@@ -810,8 +812,8 @@ namespace SecureSocketProtocol2
 
 
             CertInfo certificate = new CertInfo(serverProperties.ServerCertificate);
-            certificate.FingerPrintMd5 = BitConverter.ToString(MD5.Create().ComputeHash(ASCIIEncoding.ASCII.GetBytes(RSA.PublicKey))).Replace("-", "");
-            certificate.FingerPrintSha1 = BitConverter.ToString(SHA1.Create().ComputeHash(ASCIIEncoding.ASCII.GetBytes(RSA.PublicKey))).Replace("-", "");
+            certificate.FingerPrintMd5 = BitConverter.ToString(MD5.Create().ComputeHash(serverProperties.ServerCertificate.PrivateKey)).Replace("-", "");
+            certificate.FingerPrintSha1 = BitConverter.ToString(SHA1.Create().ComputeHash(serverProperties.ServerCertificate.PrivateKey)).Replace("-", "");
             certificate.KeyAlgorithm = "RSA with " + Connection.RSA_KEY_SIZE + "bit";
             certificate.Compression = "";//serverProperties.Compression.ToString();
             certificate.Cipher = "";// serverProperties.Encryption.ToString();
@@ -904,16 +906,19 @@ namespace SecureSocketProtocol2
                 onException(ex);
             }
 
+            Random rnd = new Random(DateTime.Now.Millisecond);
+            if (serverProperties.AllowUdp)
+            {
+                this.UdpHandshakeCode = new byte[50];
+                rnd.NextBytes(this.UdpHandshakeCode);
+            }
+
             this.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();
             Connection.SendPacket(new MsgClientInfo(this.ClientId, this.UdpHandshakeCode, this.Token), PacketId.Unknown);
             this.MessageHandler.ResetMessages();
 
             if (serverProperties.AllowUdp)
             {
-                Random rnd = new Random(DateTime.Now.Millisecond);
-                this.UdpHandshakeCode = new byte[50];
-                rnd.NextBytes(this.UdpHandshakeCode);
-
                 //let's process the UDP protocol
                 this.UdpHandle = UdpClient;
                 this.UdpSyncObject = new SyncObject(Connection);
@@ -1020,7 +1025,7 @@ namespace SecureSocketProtocol2
 
                     this.ChannelSyncObject = new SyncObject(Connection);
                     this.Connection.SendPacket(new MsgOpenChannel(), PacketId.OpenChannel, true);
-                    MsgOpenChannelResponse response = this.ChannelSyncObject.Wait<MsgOpenChannelResponse>(default(MsgOpenChannelResponse), 1000000000);
+                    MsgOpenChannelResponse response = this.ChannelSyncObject.Wait<MsgOpenChannelResponse>(default(MsgOpenChannelResponse), 30000);
 
                     if(response == null)
                         return ChannelError.Timeout;
@@ -1056,7 +1061,6 @@ namespace SecureSocketProtocol2
                     if (e.BytesTransferred >= 17)
                     {
                         //decrypt traffic here
-
                         PayloadReader pr = new PayloadReader(e.Buffer);
                         decimal clientId = pr.ReadDecimal();
                         UdpPAcketId packetId = (UdpPAcketId)pr.ReadByte();

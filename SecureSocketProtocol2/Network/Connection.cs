@@ -166,8 +166,6 @@ namespace SecureSocketProtocol2.Network
                             return;
                         }
 
-
-
                         BytesIn += (ulong)e.BytesTransferred;
                         //to make it 2x faster remove Array.Copy and set buffer offset in asyncReceiveEvent
                         //too bad i've not acomplished this yet some really weird shit is happening then
@@ -215,7 +213,7 @@ namespace SecureSocketProtocol2.Network
                                         //wopEncryption.Decrypt(header, 0, HEADER_SIZE);
                                         stream.NetworkPayload.Header = new PacketHeader(headerData, 0, this);
 
-                                        if (!DPI.Inspect(headerData, stream.NetworkPayload.Header))
+                                        if (!DPI.Inspect(stream.NetworkPayload.Header))
                                         {
                                             Client.Handle.Close();
                                             return;
@@ -312,6 +310,12 @@ namespace SecureSocketProtocol2.Network
                                 {
                                     Client.onException(ex);
                                     continue;
+                                }
+
+                                if (!Client.DPI.Inspect(null, message))
+                                {
+                                    Client.Disconnect();
+                                    return;
                                 }
 
                                 /*if(ProcessSpeed == ReceivePerformance.Unsafe)
@@ -705,13 +709,6 @@ namespace SecureSocketProtocol2.Network
                 uint length = (uint)networkPayload.Payload.Length;
                 networkPayload.Payload = protection.RemoveProtection(networkPayload.Payload, ref Offset, ref length, ref networkPayload.Header);
 
-
-                if (!DPI.Inspect(networkPayload.Payload, null))
-                {
-                    Client.Disconnect();
-                    return;
-                }
-
                 IMessage message = null;
 
                 try
@@ -736,7 +733,7 @@ namespace SecureSocketProtocol2.Network
                     //wopEncryption.Decrypt(networkPayload.Payload, 0, HEADER_SIZE);
                     networkPayload.Header = new PacketHeader(networkPayload.Payload, 0, this);
 
-                    if (!DPI.Inspect(networkPayload.Payload, networkPayload.Header))
+                    if (!DPI.Inspect(networkPayload.Header))
                     {
                         Client.Disconnect();
                         return;

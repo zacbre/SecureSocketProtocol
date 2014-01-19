@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Network.Messages;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -42,7 +43,7 @@ namespace SecureSocketProtocol2.Network
         /// <param name="data">The data to inspect</param>
         /// <param name="Header">The Packet Header</param>
         /// <returns>Can we trust this data?</returns>
-        internal bool Inspect(byte[] data, PacketHeader Header)
+        internal bool Inspect(PacketHeader Header, IMessage message = null)
         {
             lock (Rules)
             {
@@ -50,10 +51,6 @@ namespace SecureSocketProtocol2.Network
                 {
                     if (Header != null)
                     {
-                        //the header size must be correct
-                        if (data.Length != connection.HEADER_SIZE)
-                            return false;
-
                         //checking the packet size
                         if (Header.PacketSize < 0 || Header.PacketSize >= ((1000 * 1000) * 10) /*10MB*/)
                             return false;
@@ -65,9 +62,12 @@ namespace SecureSocketProtocol2.Network
                     }
                     else
                     {
+                        if (message == null)
+                            return false;
+
                         for (int i = 0; i < Rules.Count; i++)
                         {
-                            if(!Rules[i].Inspect(data))
+                            if (!Rules[i].Inspect(message))
                                 return false;
                         }
                     }

@@ -163,9 +163,10 @@ namespace SecureSocketProtocol2
                         if (Clients.ContainsKey(ClientId))
                         {
                             SSPClient client = Clients[ClientId];
+                            
 
-                            UdpClient udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, 539));
-                            udpClient.Connect((e.RemoteEndPoint as IPEndPoint).Address.ToString(), (e.RemoteEndPoint as IPEndPoint).Port);
+                            //UdpClient udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, 539));
+                            //udpClient.Connect((e.RemoteEndPoint as IPEndPoint).Address.ToString(), (e.RemoteEndPoint as IPEndPoint).Port);
 
                         }
                     }
