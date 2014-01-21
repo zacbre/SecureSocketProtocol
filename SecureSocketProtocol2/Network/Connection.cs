@@ -5,6 +5,7 @@ using SecureSocketProtocol2.Encryptions;
 using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
+using SecureSocketProtocol2.Network.Messages.TCP;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Network.Protections.Cache;
 using SecureSocketProtocol2.Network.Protections.Compression;
@@ -205,34 +206,19 @@ namespace SecureSocketProtocol2.Network
                         {
                             if (stream.CanRead(HEADER_SIZE))
                             {
-                                //if (ProcessSpeed == ReceivePerformance.Safe)
+                                byte[] headerData = new byte[HEADER_SIZE];
+                                if (stream.Read(ref headerData, 0, headerData.Length) > 0)
                                 {
-                                    byte[] headerData = new byte[HEADER_SIZE];
-                                    if (stream.Read(ref headerData, 0, headerData.Length) > 0)
-                                    {
-                                        //wopEncryption.Decrypt(header, 0, HEADER_SIZE);
-                                        stream.NetworkPayload.Header = new PacketHeader(headerData, 0, this);
+                                    //wopEncryption.Decrypt(header, 0, HEADER_SIZE);
+                                    stream.NetworkPayload.Header = new PacketHeader(headerData, 0, this);
 
-                                        if (!DPI.Inspect(stream.NetworkPayload.Header))
-                                        {
-                                            Client.Handle.Close();
-                                            return;
-                                        }
-                                        this.stream.ReceiveState = ReceiveType.Payload;
+                                    if (!DPI.Inspect(stream.NetworkPayload.Header))
+                                    {
+                                        Client.Handle.Close();
+                                        return;
                                     }
-                                }
-                                /*else if (ProcessSpeed == ReceivePerformance.Unsafe)
-                                {
-                                    wopEncryption.Decrypt(stream.Buffer, stream.Position, HEADER_SIZE);
-                                    stream.NetworkPayload.PacketSize = stream.Buffer[stream.Position] | stream.Buffer[stream.Position + 1] << 8 | stream.Buffer[stream.Position + 2] << 16;
-                                    stream.NetworkPayload.isCompressed = PacketOption.Compression == ((PacketOption)stream.Buffer[3] & PacketOption.Compression);
-                                    stream.NetworkPayload.isCached = PacketOption.Cache == ((PacketOption)stream.Buffer[3] & PacketOption.Cache);
-                                    stream.NetworkPayload.packetId = (PacketId)stream.Buffer[stream.Position + 4];
-                                    stream.NetworkPayload.MessageId = BitConverter.ToUInt32(stream.Buffer, stream.Position + 7);
-                                    stream.NetworkPayload.PluginId = BitConverter.ToUInt64(stream.Buffer, stream.Position + 11);
                                     this.stream.ReceiveState = ReceiveType.Payload;
-                                    stream.Position += Connection.HEADER_SIZE;
-                                }*/
+                                }
                             }
                             else
                             {
@@ -586,7 +572,7 @@ namespace SecureSocketProtocol2.Network
                 header.MessageId = MessageId;
                 npw.vStream.Position = 0;
                 header.WriteHeader(payload, 0, (int)PayloadLength, npw);
-                //npw.WriteBytes(payload, 0, (int)PayloadLength);
+                npw.WriteBytes(payload, HEADER_SIZE, (int)PayloadLength);
 
                 //encrypt the header
                 /*wopEncryption.Encrypt(temp, 0, HEADER_SIZE);
@@ -651,59 +637,6 @@ namespace SecureSocketProtocol2.Network
             networkPayload.WriteOffset += (uint)received;
             if (networkPayload.WriteOffset == networkPayload.PacketSize && networkPayload.ReceivedHeader)
             {
-                /*if (this.EncryptionType == EncryptionType.Wop)
-                    networkPayload.Payload = wopEncryption.Decrypt(networkPayload.Payload, 0, networkPayload.Payload.Length);
-                else if (this.EncryptionType == EncryptionType.AES)
-                    networkPayload.Payload = aesEncryption.Decrypt(networkPayload.Payload, 0, networkPayload.Payload.Length);
-                else if (this.EncryptionType == EncryptionType.UnsafeXor)
-                    networkPayload.Payload = unsafeXorEncryption.Decrypt(networkPayload.Payload, 0, networkPayload.Payload.Length);
-                else
-                {
-
-                }
-
-                if (networkPayload.isCompressed)
-                {
-                    if (this.CompressionType == CompressionType.QuickLZ)
-                    {
-                        networkPayload.Payload = quickLZ.decompress(networkPayload.Payload, 0);
-                    }
-                    else if (this.CompressionType == CompressionType.LZ4)
-                    {
-                        networkPayload.Payload = this.Lz4Decompressor.Decompress(networkPayload.Payload);
-                    }
-                    else if (this.CompressionType == CompressionType.LZMA)
-                    {
-                        using (MemoryStream outStream = new MemoryStream())
-                        {
-                            lzmaCompressor.DecompressLZMA(new MemoryStream(networkPayload.Payload), outStream);
-                            networkPayload.Payload = outStream.ToArray();
-                        }
-                    }
-                    else if (this.CompressionType == CompressionType.Gzip)
-                    {
-                        using (MemoryStream outStream = new MemoryStream())
-                        {
-                            using (GZipStream gs = new GZipStream(outStream, CompressionMode.Decompress))
-                            {
-                                gs.Write(networkPayload.Payload, 3, networkPayload.Payload.Length-3);
-                                networkPayload.Payload = outStream.ToArray();
-
-                                int DecompressedSize = networkPayload.Payload[0] | networkPayload.Payload[1] << 8 | networkPayload.Payload[2] << 16;
-                                byte[] decompressed = new byte[DecompressedSize];
-                                int readed = gs.Read(decompressed, 0, decompressed.Length);
-                                networkPayload.Payload = decompressed;
-                            }
-                        }
-                    }
-                }
-
-                if (networkPayload.isCached)
-                {
-                    networkPayload.Payload = ReceiveCache.DeCache(networkPayload.Payload, 0, networkPayload.Payload.Length);
-                }*/
-
-
                 //decrypt, decompress, de-cache the data we received
                 uint Offset = 0;
                 uint length = (uint)networkPayload.Payload.Length;

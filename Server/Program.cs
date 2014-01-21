@@ -53,7 +53,7 @@ namespace Server
         public override ushort ListenPort { get { return 539; } }
         public override string ListenIp { get { return "0.0.0.0"; } }
         public override object[] BaseClientArguments { get { return new object[0]; } }
-        public override bool AllowUdp { get { return false; } }
+        public override bool AllowUdp { get { return true; } }
         public override bool UserPassAuthenication { get { return true; } }
 
 
@@ -69,7 +69,7 @@ namespace Server
             {
                 return new Stream[]
                 {
-                    new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
+                    //new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
                 };
             }
         }

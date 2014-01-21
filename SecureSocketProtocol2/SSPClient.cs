@@ -17,13 +17,15 @@ using SecureSocketProtocol2.Encryptions;
 using System.Security.Cryptography;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Hashers;
+using SecureSocketProtocol2.Network.Messages.UDP;
+using SecureSocketProtocol2.Network.Messages.TCP;
 
 namespace SecureSocketProtocol2
 {
     public abstract class SSPClient : IClient
     {
         public abstract void onReceiveMessage(IMessage message);
-        public abstract void onReceiveUdpData(byte[] data, int size);
+        public abstract void onReceiveUdpMessage(IMessage message);
         public abstract void onClientConnect();
         public abstract void onValidatingComplete();
         public abstract void onDisconnect();
@@ -75,9 +77,16 @@ namespace SecureSocketProtocol2
         public bool ServerAllowsReconnecting { get; internal set; }
         private DiffieHellman diffieHellman;
         internal bool CompletedHandshake { get; private set; }
+
+        /// <summary> This object is only being used client-sided </summary>
         private SocketAsyncEventArgs UdpAsyncReceiveEvent;
         private SyncObject UdpSyncObject;
         public CertInfo Certificate { get; private set; }
+
+        /// <summary>
+        /// Shows to which side he belongs, Running at the Server or is it a Client
+        /// </summary>
+        public PeerSide PeerSide { get; private set; }
 
         public byte[] PrivateKey
         {
@@ -332,37 +341,34 @@ namespace SecureSocketProtocol2
         /// <summary>
         /// Send data to the other side using the UDP protocol
         /// </summary>
-        /// <param name="data">The data you want to sent</param>
-        /// <param name="offset">The index where the data starts</param>
-        /// <param name="length">The length of the data</param>
+        /// <param name="message">The message you want to sent</param>
         /// <returns>Successful or error</returns>
-        public SSPError SendUdpPacket(byte[] data, int offset, int length)
+        public SSPError SendUdpMessage(IMessage message)
         {
             lock (UdpHandle)
             {
-                return SendUdpPacket(data, offset, length, UdpPAcketId.Payload);
+                return SendUdpMessage(message, UdpPAcketId.Payload);
             }
         }
 
-        internal SSPError SendUdpPacket(byte[] data, int offset, int length, UdpPAcketId packetId)
+        internal SSPError SendUdpMessage(IMessage message, UdpPAcketId packetId)
         {
             lock (UdpHandle)
             {
                 PayloadWriter pw = new PayloadWriter();
                 pw.WriteDecimal(this.ClientId);
                 pw.WriteByte((byte)packetId);
-                pw.WriteBytes(data, offset, length);
-                byte[] payload = pw.GetBuffer();
-
-                //add encryption here
-
-                this.UdpHandle.SendTo(payload, 0, pw.Length, SocketFlags.None, this.UdpEndPoint);
+                pw.WriteUInteger(Connection.messageHandler.GetMessageId(message.GetType()));
+                message.WritePacket(message, ref pw);
+                this.UdpHandle.SendTo(pw.GetBuffer(), 0, pw.Length, SocketFlags.None, this.UdpEndPoint);
                 return SSPError.ErrorSuccess;
             }
         }
 
         private bool CreateHandshake(string HostIp, ushort Port, IPlugin[] Plugins)
         {
+            this.PeerSide = SecureSocketProtocol2.PeerSide.Client;
+
             //apply private key
             Connection.protection.ApplyPrivateKey(Properties.PrivateKey);
 
@@ -561,13 +567,10 @@ namespace SecureSocketProtocol2
                 SyncObject udpSync = Connection.Receive(onClientUdpHandshake);
                 bool UdpSuccess = false;
 
-                PayloadWriter pw = new PayloadWriter();
-                pw.WriteDecimal(this.ClientId);
-                this.UdpHandle.SendTo(pw.ToByteArray(), this.UdpEndPoint);
-
-                for (int i = 0; i < 35/5; i++)
+                //if the 10 tries failed we wasted 50 seconds of our life :c
+                for (int i = 0; i < 10; i++)
                 {
-                    SendUdpPacket(this.UdpHandshakeCode, 0, this.UdpHandshakeCode.Length, UdpPAcketId.Handshake);
+                    SendUdpMessage(new MsgUdpHandshake(this.UdpHandshakeCode), UdpPAcketId.Handshake);
                     if (udpSync.Wait<bool>(false, 5000))
                     {
                         UdpSuccess = true;
@@ -580,6 +583,7 @@ namespace SecureSocketProtocol2
                     Disconnect();
                     throw new Exception("The server did not respond in time to acknowledge the UDP connection");
                 }
+                this.UdpHandshaked = true;
             }
 
             this.MessageHandler.ResetMessages();
@@ -710,13 +714,25 @@ namespace SecureSocketProtocol2
 
         private bool onClientUdpHandshake(IMessage message)
         {
-            //if (payload.Length == 5)
-            //    return payload[0] == 0x8F && payload[1] == 0xFF && payload[2] == 0x46 && payload[3] == 0x4F && payload[4] == 0x37;
+            MsgUdpValidation validation = message as MsgUdpValidation;
+
+            if (validation == null)
+                return false;
+
+            if (validation.Validation.Length == 5)
+            {
+                //for now hardcoded values, need to change this soon!
+                return validation.Validation[0] == 0x8F && validation.Validation[1] == 0xFF &&
+                       validation.Validation[2] == 0x46 && validation.Validation[3] == 0x4F &&
+                       validation.Validation[4] == 0x37;
+            }
             return false;
         }
 
         internal unsafe bool ServerHandshake(ServerProperties serverProperties, Socket UdpClient, GetClientsDelegate getClientsDelegate, PrivateKeyHandler KeyHandler)
         {
+            this.PeerSide = SecureSocketProtocol2.PeerSide.Server;
+
             //check certificate info
             if (serverProperties.ServerCertificate.PrivateKey == null || (serverProperties.ServerCertificate.PrivateKey != null && serverProperties.ServerCertificate.PrivateKey.Length <= 16))
                 throw new ArgumentException("The private key must be longer then 16 in length", "PrivateKey");
@@ -915,21 +931,13 @@ namespace SecureSocketProtocol2
 
             this.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();
             Connection.SendPacket(new MsgClientInfo(this.ClientId, this.UdpHandshakeCode, this.Token), PacketId.Unknown);
-            this.MessageHandler.ResetMessages();
+            
 
             if (serverProperties.AllowUdp)
             {
                 //let's process the UDP protocol
                 this.UdpHandle = UdpClient;
                 this.UdpSyncObject = new SyncObject(Connection);
-                this.UdpEndPoint = new IPEndPoint(IPAddress.Parse(this.RemoteIp), 0);
-                /*this.UdpAsyncReceiveEvent = new SocketAsyncEventArgs();
-                this.UdpAsyncReceiveEvent.SetBuffer(new byte[65535], 0, 65535);
-                this.UdpAsyncReceiveEvent.RemoteEndPoint = this.UdpEndPoint;
-                this.UdpAsyncReceiveEvent.Completed += AsyncSocketCallback;
-
-                if (!UdpClient.ReceiveFromAsync(UdpAsyncReceiveEvent))
-                    AsyncSocketCallback(null, UdpAsyncReceiveEvent);*/
 
                 if (!this.UdpSyncObject.Wait<bool>(false, 30000))
                 {
@@ -937,6 +945,8 @@ namespace SecureSocketProtocol2
                     return false;
                 }
             }
+
+            this.MessageHandler.ResetMessages();
 
             IPlugin[] plugins = onGetPlugins();
             Connection.SendPacket(new MsgPluginCount(plugins.Length), PacketId.Unknown);
@@ -1004,6 +1014,18 @@ namespace SecureSocketProtocol2
         internal void StartReceiver()
         {
             this.Connection.StartNetworkStream();
+
+            if (UdpHandle != null)
+            {
+                this.UdpAsyncReceiveEvent = new SocketAsyncEventArgs();
+                this.UdpAsyncReceiveEvent.SetBuffer(new byte[70000], 0, 70000);
+                this.UdpAsyncReceiveEvent.RemoteEndPoint = this.UdpEndPoint;
+                this.UdpAsyncReceiveEvent.Completed += AsyncSocketCallback;
+                this.UdpAsyncReceiveEvent.AcceptSocket = this.UdpHandle;
+
+                if (!UdpHandle.ReceiveFromAsync(UdpAsyncReceiveEvent))
+                    AsyncSocketCallback(null, UdpAsyncReceiveEvent);
+            }
         }
 
         /// <summary>
@@ -1052,65 +1074,95 @@ namespace SecureSocketProtocol2
             return ChannelError.InitializeError;
         }
 
-        private unsafe void AsyncSocketCallback(object o, SocketAsyncEventArgs e)
+        internal unsafe void AsyncSocketCallback(object o, SocketAsyncEventArgs e)
         {
             if (e.LastOperation == SocketAsyncOperation.ReceiveFrom)
             {
                 try
                 {
-                    if (e.BytesTransferred >= 17)
+                    if (e.BytesTransferred >= 21)
                     {
+                        if (!Connected)
+                            return; //TCP Client is disconnected so don't process UDP packets
+
+                        //before we process the packet, does the IP/LocalPort match ?
+                        if (UdpHandshaked && BitConverter.ToUInt32(this.UdpEndPoint.Address.GetAddressBytes(), 0) !=
+                                                BitConverter.ToUInt32(((IPEndPoint)e.RemoteEndPoint).Address.GetAddressBytes(), 0))
+                        {
+                            //simply skip and don't disconnect TCP
+                            //I'll add later a option to the server to disconnect or not just for safety reasons ;)
+                            return;
+                        }
+
                         //decrypt traffic here
                         PayloadReader pr = new PayloadReader(e.Buffer);
                         decimal clientId = pr.ReadDecimal();
-                        UdpPAcketId packetId = (UdpPAcketId)pr.ReadByte();
-                        byte[] payload = pr.ReadBytes(e.BytesTransferred - pr.Offset);
 
-                        if (this.ClientId == clientId)
+                        //extra check
+                        if (this.ClientId != clientId)
+                            return;
+
+                        UdpPAcketId packetId = (UdpPAcketId)pr.ReadByte();
+                        uint MessageId = pr.ReadUInteger();
+
+                        IMessage message = null;
+                        try
                         {
-                            if (UdpHandshaked)
+                            message = Connection.messageHandler.HandleUdpMessage(pr, MessageId);
+
+                            if (message != null)
                             {
-                                switch (packetId)
-                                {
-                                    case UdpPAcketId.Payload:
+                                message.RawSize = e.BytesTransferred;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            return;
+                        }
+
+
+                        //process packet
+                        if (UdpHandshaked)
+                        {
+                            switch (packetId)
+                            {
+                                case UdpPAcketId.Payload:
                                     {
-                                        onReceiveUdpData(payload, payload.Length);
+                                        onReceiveUdpMessage(message);
                                         break;
                                     }
-                                }
-                            }
-                            else
-                            {
-                                if (payload.Length == this.UdpHandshakeCode.Length)
-                                {
-                                    fixed (byte* ptr = payload, ptr2 = this.UdpHandshakeCode)
-                                    {
-                                        if (NativeMethods.memcmp(ptr, ptr2, (uint)this.UdpHandshakeCode.Length) == 0)
-                                        {
-                                            this.UdpEndPoint = e.RemoteEndPoint as IPEndPoint;
-                                            this.UdpAsyncReceiveEvent.RemoteEndPoint = this.UdpEndPoint;
-                                            Connection.SendPacket(new MsgUdpValidation(new byte[] { 0x8F, 0xFF, 0x46, 0x4F, 0x37 }), PacketId.Unknown, true, true);
-                                            UdpHandshaked = true;
-                                            UdpSyncObject.Value = true;
-                                            UdpSyncObject.Pulse();
-                                        }
-                                    }
-                                }
                             }
                         }
                         else
                         {
-
+                            MsgUdpHandshake HandshakeMsg = message as MsgUdpHandshake;
+                            if (HandshakeMsg != null)
+                            {
+                                fixed (byte* ptr = HandshakeMsg.HandshakeCode, ptr2 = this.UdpHandshakeCode)
+                                {
+                                    if (NativeMethods.memcmp(ptr, ptr2, (uint)this.UdpHandshakeCode.Length) == 0)
+                                    {
+                                        this.UdpEndPoint = e.RemoteEndPoint as IPEndPoint;
+                                        Connection.SendPacket(new MsgUdpValidation(new byte[] { 0x8F, 0xFF, 0x46, 0x4F, 0x37 }), PacketId.Unknown, true, true);
+                                        UdpHandshaked = true;
+                                        UdpSyncObject.Value = true;
+                                        UdpSyncObject.Pulse();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     onException(ex);
                 }
 
-                if (!UdpHandle.ReceiveFromAsync(UdpAsyncReceiveEvent))
-                    AsyncSocketCallback(null, UdpAsyncReceiveEvent);
+                if (PeerSide == SecureSocketProtocol2.PeerSide.Client)
+                {
+                    if (!UdpHandle.ReceiveFromAsync(UdpAsyncReceiveEvent))
+                        AsyncSocketCallback(null, UdpAsyncReceiveEvent);
+                }
             }
             else
             {

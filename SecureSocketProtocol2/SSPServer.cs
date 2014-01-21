@@ -91,7 +91,7 @@ namespace SecureSocketProtocol2
                     client.Handle = e.AcceptSocket;
                     client.Connection = new Connection(client);
                     client.RemoteIp = ((IPEndPoint)e.AcceptSocket.RemoteEndPoint).Address.ToString();
-                    client.ClientId = new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//randomDecimal.NextDecimal();//
+                    client.ClientId = randomDecimal.NextDecimal();//new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//
                     client.ServerAllowsReconnecting = client.ReconnectAtDisconnect;
                     client.ServerSided = true;
 
@@ -153,27 +153,29 @@ namespace SecureSocketProtocol2
         {
             if (e.LastOperation == SocketAsyncOperation.ReceiveFrom)
             {
-                if (e.BytesTransferred >= 16)
+                try
                 {
-                    PayloadReader pr = new PayloadReader(e.Buffer);
-                    decimal ClientId = pr.ReadDecimal();
-
-                    lock (Clients)
+                    if (e.BytesTransferred >= 21)
                     {
-                        if (Clients.ContainsKey(ClientId))
+                        PayloadReader pr = new PayloadReader(e.Buffer);
+                        decimal ClientId = pr.ReadDecimal();
+
+                        lock (Clients)
                         {
-                            SSPClient client = Clients[ClientId];
-                            
-
-                            //UdpClient udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, 539));
-                            //udpClient.Connect((e.RemoteEndPoint as IPEndPoint).Address.ToString(), (e.RemoteEndPoint as IPEndPoint).Port);
-
+                            if (Clients.ContainsKey(ClientId))
+                            {
+                                SSPClient client = Clients[ClientId];
+                                client.AsyncSocketCallback(o, e);
+                            }
                         }
                     }
                 }
+                catch { }
 
                 if (!UdpServer.ReceiveFromAsync(udpAsyncSocket))
+                {
                     UdpAsyncSocketCallback(null, udpAsyncSocket);
+                }
             }
         }
 

@@ -1,4 +1,6 @@
 ﻿using SecureSocketProtocol2.Hashers;
+using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.UDP;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -49,6 +51,7 @@ namespace SecureSocketProtocol2.Network.Messages
                 AddMessage(typeof(MsgAuthenication), "HANDSHAKE_AUTHENICATION");
                 AddMessage(typeof(MsgAuthenicationSuccess), "HANDSHAKE_AUTHENICATION_RESPONSE");
                 AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
+                AddMessage(typeof(MsgUdpHandshake), "UDP_HANDSHAKE"); //use incase if UDP is going to be used
             }
         }
 
@@ -113,6 +116,21 @@ namespace SecureSocketProtocol2.Network.Messages
 
                 IMessage message = (IMessage)Activator.CreateInstance(type, new object[0]);
                 message.ReadPacket(message, reader, this);
+                message.RawSize = reader.Packet.Length;
+                return message;
+            }
+        }
+
+        public IMessage HandleUdpMessage(PayloadReader reader, uint MessageId)
+        {
+            lock (Messages)
+            {
+                Type type = null;
+                if (!Messages.TryGetValue(MessageId, out type))
+                    return null;
+
+                IMessage message = (IMessage)Activator.CreateInstance(type, new object[0]);
+                message.ReadUdpPacket(message, reader);
                 message.RawSize = reader.Packet.Length;
                 return message;
             }

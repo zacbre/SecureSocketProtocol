@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace SecureSocketProtocol2.Network.Messages
+namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     internal class MsgUdpValidation : IMessage
     {
@@ -17,7 +17,7 @@ namespace SecureSocketProtocol2.Network.Messages
         public MsgUdpValidation(byte[] Validation)
             : base()
         {
-
+            this.Validation = Validation;
         }
     }
 }

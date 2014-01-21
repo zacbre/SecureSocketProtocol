@@ -37,7 +37,7 @@ namespace Client
                 218, 155
             }, new Stream[]
             {//key files
-                new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
+                //new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
             },//login
                "Dergan", "Hunter:)")
         {
@@ -185,7 +185,7 @@ namespace Client
             Console.WriteLine("Connected");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
 
-            byte[] buffer = new byte[65535];
+            byte[] buffer = new byte[60000];
             Stopwatch sw = Stopwatch.StartNew();
             int packets = 0;
             ulong DataPerSec = 0;
@@ -228,7 +228,7 @@ namespace Client
                 msg.Graf++;
                 msg.PauperGraf++;
                 //rnd.NextBytes(msg.Stuff);
-                base.SendMessage(msg);
+                base.SendUdpMessage(msg);
 
                 if (sw.ElapsedMilliseconds >= 1000)
                 {
@@ -276,7 +276,7 @@ namespace Client
 
         }
 
-        public override void onReceiveUdpData(byte[] data, int size)
+        public override void onReceiveUdpMessage(IMessage message)
         {
 
         }

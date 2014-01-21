@@ -90,14 +90,14 @@ namespace Server
 
         }
 
-        public override void onReceiveUdpData(byte[] data, int size)
+        public override void onReceiveUdpMessage(IMessage message)
         {
             PacketsPerSec++;
-            Received += (ulong)size;
+            Received += (ulong)message.RawSize;
 
             if (speedSW.ElapsedMilliseconds >= 1000)
             {
-                Console.WriteLine("[UDP] last size:" + size +
+                Console.WriteLine("[UDP] last size:" + message.RawSize +
                                   ", Packet /sec:" + PacketsPerSec +
                                   ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]" +
                                   ", bit:" + Math.Round(((float)((float)Received * 8F) / 1024F) / 1024F, 2));

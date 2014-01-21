@@ -23,6 +23,12 @@ namespace SecureSocketProtocol2
     public delegate SyncObject ReceiveDeletegate(ReceiveCallback message);
     public delegate SSPClient[] GetClientsDelegate();
 
+    public enum PeerSide
+    {
+        Server,
+        Client
+    }
+
     public enum SocksVersion
     {
         Socks5

@@ -1,6 +1,7 @@
 ﻿using SecureSocketProtocol2;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
+using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Plugin;
 using System;
 using System.Collections.Generic;
@@ -59,11 +60,6 @@ namespace Benchmarker
         }
 
         public override void onReceiveMessage(SecureSocketProtocol2.Network.Messages.IMessage message)
-        {
-
-        }
-
-        public override void onReceiveUdpData(byte[] data, int size)
         {
 
         }
@@ -147,6 +143,11 @@ namespace Benchmarker
         }
 
         public override void onAuthenticated()
+        {
+
+        }
+
+        public override void onReceiveUdpMessage(IMessage message)
         {
 
         }

@@ -65,9 +65,8 @@ namespace SecureSocketProtocol2.Network.Messages
             }
         }
 
-        public byte[] WritePacket(IMessage message, ref int MessageSize)
+        public void WritePacket(IMessage message, ref PayloadWriter pw)
         {
-            PayloadWriter pw = new PayloadWriter();
             FieldInfo[] fields = message.GetType().GetFields();
 
             for (int i = 0; i < fields.Length; i++)
@@ -76,8 +75,16 @@ namespace SecureSocketProtocol2.Network.Messages
                 Type type = (obj == null ? null : obj.GetType());
                 pw.WriteObject(obj);
             }
-            MessageSize = pw.Length;
-            return pw.GetBuffer();
+        }
+
+        public void ReadUdpPacket(IMessage message, PayloadReader pr)
+        {
+            FieldInfo[] fields = message.GetType().GetFields();
+
+            for (int i = 0; i < fields.Length; i++)
+            {
+                fields[i].SetValue(message, pr.ReadObject());
+            }
         }
 
         public void ReadPacket(IMessage message, PayloadReader pr, MessageHandler handler)
@@ -94,8 +101,7 @@ namespace SecureSocketProtocol2.Network.Messages
                 for (int i = 0; i < fields.Length; i++)
                 {
                     //de-serialize objects
-                    object obj = pr.ReadObject();
-                    fields[i].SetValue(message, obj);
+                    fields[i].SetValue(message, pr.ReadObject());
                 }
             }
         }

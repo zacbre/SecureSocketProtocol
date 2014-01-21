@@ -1,4 +1,5 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
+using SecureSocketProtocol2.Network.Messages.TCP;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -27,7 +28,8 @@ namespace SecureSocketProtocol2.Network
             {
                 lock(Connection)
                 {
-                    if (State == ConnectionState.Closed)
+                    //todo: need to look at channels soon, haven't worked at channels for a while
+                    /*if (State == ConnectionState.Closed)
                         return ChannelError.ChannelClosed;
 
                     int size = 0;
@@ -36,7 +38,7 @@ namespace SecureSocketProtocol2.Network
                     Array.Resize(ref msgData, size);
 
                     MsgChannelPayload payloadMessage = new MsgChannelPayload(this, msgData, MsgId);
-                    Connection.SendPacket(payloadMessage, PacketId.ChannelPayload);
+                    Connection.SendPacket(payloadMessage, PacketId.ChannelPayload);*/
                 }
             }
             catch(Exception ex)

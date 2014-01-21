@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace SecureSocketProtocol2.Network.Messages
+namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     /// <summary>
     /// This message is being used in the HandShake

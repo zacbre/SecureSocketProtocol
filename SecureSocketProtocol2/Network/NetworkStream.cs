@@ -31,14 +31,14 @@ namespace SecureSocketProtocol2.Network
         {
             lock (Buffer)
             {
-                if (this.Position + count <= Buffer.Length)
+                if (CanRead(count))
                 {
                     Array.Copy(this.Buffer, this.Position, buffer, offset, count);
                     this.Position += count;
                     return count;
                 }
             }
-            return 0;
+            return -1;
         }
 
         public bool CanRead(int count)
