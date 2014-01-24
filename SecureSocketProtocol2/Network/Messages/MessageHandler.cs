@@ -52,6 +52,8 @@ namespace SecureSocketProtocol2.Network.Messages
                 AddMessage(typeof(MsgAuthenicationSuccess), "HANDSHAKE_AUTHENICATION_RESPONSE");
                 AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
                 AddMessage(typeof(MsgUdpHandshake), "UDP_HANDSHAKE"); //use incase if UDP is going to be used
+                AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
+                AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
             }
         }
 
@@ -153,6 +155,8 @@ namespace SecureSocketProtocol2.Network.Messages
             AddMessage(typeof(MsgGetPluginInfo), "HANDSHAKE_GET_PLUGIN_INFO");
             AddMessage(typeof(MsgGetPluginInfoResponse), "HANDSHAKE_GET_PLUGIN_INFO_RESPONSE");
             AddMessage(typeof(MsgInitPlugin), "HANDSHAKE_GET_INIT_PLUGIN");
+            AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
+            AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
         }
     }
 }

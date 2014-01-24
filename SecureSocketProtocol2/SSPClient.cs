@@ -78,6 +78,25 @@ namespace SecureSocketProtocol2
         private DiffieHellman diffieHellman;
         internal bool CompletedHandshake { get; private set; }
 
+        /// <summary>
+        /// A server-client time synchronisation, Server takes the lead in having the time.
+        /// </summary>
+        public DateTime TimeSync
+        {
+            get
+            {
+                if (TimeSyncSW == null)
+                    return _timeSync;
+                return _timeSync.Add(TimeSyncSW.Elapsed);
+            }
+            private set
+            {
+                this._timeSync = value;
+            }
+        }
+        private DateTime _timeSync;
+        private Stopwatch TimeSyncSW; //used for updating the TimeSync
+
         /// <summary> This object is only being used client-sided </summary>
         private SocketAsyncEventArgs UdpAsyncReceiveEvent;
         private SyncObject UdpSyncObject;
@@ -525,6 +544,43 @@ namespace SecureSocketProtocol2
             }
             Connection.SendPacket(new MsgOk(), PacketId.Unknown); //tell the server it's ok
 
+            //do a time synchronisation
+            bool QuitSyncLoop = false;
+            for (int i = 0; i < 10; i++) //only give it 10 tries
+            {
+                if (!(syncObject = Connection.Receive((IMessage message) =>
+                {
+                    MsgTimeSync time = message as MsgTimeSync;
+
+                    if (time != null)
+                    {
+                        this._timeSync = DateTime.FromBinary(time.Time);
+                        this.TimeSyncSW = Stopwatch.StartNew();
+                        Connection.SendPacket(new MsgTimeSyncResponse(this.TimeSync.ToBinary()), PacketId.Unknown);
+                        return true;
+                    }
+                    else
+                    {
+                        //if we receive MsgOK then we can quit synchronizing the time
+                        if (message as MsgOk != null)
+                        {
+                            QuitSyncLoop = true;
+                            return true;
+                        }
+                    }
+                    return false;
+                })).Wait<bool>(false, 15000))
+                {
+                    Disconnect();
+                    if (syncObject.TimedOut)
+                        throw new Exception("A timeout occured, this means the server did not respond for ~10 seconds");
+                    throw new Exception("Failed to synchronize the time with the server");
+                }
+                if (QuitSyncLoop)
+                    break;
+            }
+
+
             try
             {
                 //at this point you could use extra keyfiles or other security measures
@@ -910,6 +966,58 @@ namespace SecureSocketProtocol2
             {
                 Disconnect();
                 return false;
+            }
+
+            //do a time sync till it's correct at <=5 seconds after 10 tries
+            for (int i = 0; i < 10; i++)
+            {
+                Stopwatch TimeSW = Stopwatch.StartNew();
+                Connection.SendPacket(new MsgTimeSync(DateTime.Now), PacketId.Unknown);
+
+                if (!Connection.Receive((IMessage message) =>
+                {
+                    MsgTimeSyncResponse response = message as MsgTimeSyncResponse;
+                    if (response != null)
+                    {
+                        DateTime ResponseTime = DateTime.FromBinary(response.Time);
+                        DateTime TimeNow = DateTime.Now;
+
+                        if (ResponseTime > DateTime.Now)
+                        {
+                            //something went wrong... shouldn't be possible
+                            return false;
+                        }
+                        else
+                        {
+                            if (TimeNow.Year != ResponseTime.Year || TimeNow.Month != ResponseTime.Month || TimeNow.Day != ResponseTime.Day ||
+                                TimeNow.Hour != ResponseTime.Hour)
+                            {
+                                return false;
+                            }
+                            else
+                            {
+                                //check seconds difference
+                                if (TimeNow.Subtract(ResponseTime).Seconds <= 5)
+                                {
+                                    Connection.SendPacket(new MsgOk(), PacketId.Payload);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }).Wait<bool>(false, 10000))
+                {
+                    if (i + 1 >= 10)
+                    {
+                        Disconnect();
+                        return false;
+                    }
+                }
+                else
+                {
+                    break;
+                }
             }
 
             try

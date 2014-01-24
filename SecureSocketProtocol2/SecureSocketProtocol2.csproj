@@ -142,6 +142,8 @@
     <Compile Include="Network\Messages\TCP\MsgReconnect.cs" />
     <Compile Include="Network\Messages\TCP\MsgRsaPublicKey.cs" />
     <Compile Include="Network\Messages\TCP\MsgServerEncryption.cs" />
+    <Compile Include="Network\Messages\TCP\MsgTimeSync.cs" />
+    <Compile Include="Network\Messages\TCP\MsgTimeSyncResponse.cs" />
     <Compile Include="Network\Messages\TCP\MsgUdpValidation.cs" />
     <Compile Include="Network\Messages\TCP\MsgValidation.cs" />
     <Compile Include="Network\Messages\UDP\MsgUdpHandshake.cs" />

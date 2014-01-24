@@ -185,6 +185,13 @@ namespace Client
             Console.WriteLine("Connected");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
 
+
+            while (true)
+            {
+                Console.WriteLine("Synchronized Server Time: " + base.TimeSync.Hour.ToString("D2") + ":" + base.TimeSync.Minute.ToString("D2") + ":" + base.TimeSync.Second.ToString("D2") + ", " + base.TimeSync.Millisecond);
+                Thread.Sleep(1000);
+            }
+
             byte[] buffer = new byte[60000];
             Stopwatch sw = Stopwatch.StartNew();
             int packets = 0;
