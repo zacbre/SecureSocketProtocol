@@ -119,6 +119,7 @@
     <Compile Include="Misc\NativeMethods.cs" />
     <Compile Include="Network\Connection.cs" />
     <Compile Include="Network\DeepPacketInspection.cs" />
+    <Compile Include="Network\DeserializationBinder.cs" />
     <Compile Include="Network\DPIRule.cs" />
     <Compile Include="Network\HeaderInfo.cs" />
     <Compile Include="Network\Messages\MessageCache.cs" />

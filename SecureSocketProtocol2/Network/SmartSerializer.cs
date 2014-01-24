@@ -141,6 +141,7 @@ namespace SecureSocketProtocol2.Network
                 case ObjectTypes.Other:
                 {
                     BinaryFormatter bf = new BinaryFormatter();
+                    bf.Binder = new DeserializationBinder();
                     return bf.Deserialize(new MemoryStream(pr.ReadBytes(pr.Packet.Length - pr.Offset)));
                 }
                 case ObjectTypes.Byte: return pr.ReadByte();
