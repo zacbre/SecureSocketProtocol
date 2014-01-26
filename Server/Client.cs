@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using TestPlugin;
 
 namespace Server
 {
@@ -55,11 +56,11 @@ namespace Server
             Console.WriteLine("Client accepted");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
 
-            while (true)
+            /*while (true)
             {
                 Console.WriteLine("Server Time: " + DateTime.Now.Hour.ToString("D2") + ":" + DateTime.Now.Minute.ToString("D2") + ":" + DateTime.Now.Second.ToString("D2") + ", " + DateTime.Now.Millisecond);
                 Thread.Sleep(1000);
-            }
+            }*/
         }
 
         public override void onValidatingComplete()
@@ -128,7 +129,7 @@ namespace Server
         {
             return new IPlugin[]
             {
-
+                new TestPlug()
             };
         }
 

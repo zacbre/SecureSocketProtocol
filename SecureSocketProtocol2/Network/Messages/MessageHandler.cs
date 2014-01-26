@@ -22,8 +22,10 @@ namespace SecureSocketProtocol2.Network.Messages
             this.ReceiveCache = new MessageCache(this);
             this.Messages = new SortedList<uint, Type>();
             this.hasher = new MurmurHash2Unsafe();
-            this.AddMessage(typeof(MsgValidation), "HANDSHAKE_VALIDATION");
-            this.AddMessage(typeof(MsgMessageSeed), "HANDSHAKE_SEED");
+            AddMessage(typeof(MsgValidation), "HANDSHAKE_VALIDATION");
+            AddMessage(typeof(MsgMessageSeed), "HANDSHAKE_SEED");
+            AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
+            AddMessage(typeof(MsgDummy), "HANDSHAKE_DUMMY");
         }
 
         internal void RegisterMessages(uint Seed)
@@ -50,7 +52,6 @@ namespace SecureSocketProtocol2.Network.Messages
                 AddMessage(typeof(MsgRsaPublicKey), "HANDSHAKE_RSA_PUBLICKEY");
                 AddMessage(typeof(MsgAuthenication), "HANDSHAKE_AUTHENICATION");
                 AddMessage(typeof(MsgAuthenicationSuccess), "HANDSHAKE_AUTHENICATION_RESPONSE");
-                AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
                 AddMessage(typeof(MsgUdpHandshake), "UDP_HANDSHAKE"); //use incase if UDP is going to be used
                 AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
                 AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
@@ -146,7 +147,6 @@ namespace SecureSocketProtocol2.Network.Messages
             Messages.Clear();
             AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
             AddMessage(typeof(MsgKeepAlive), "KEEP_ALIVE");
-            AddMessage(typeof(MsgChannelPayload), "CHANNEL_PAYLOAD");
             AddMessage(typeof(MsgCloseChannel), "CHANNEL_CLOSE");
             AddMessage(typeof(MsgOpenChannel), "CHANNEL_OPEN");
             AddMessage(typeof(MsgOpenChannelResponse), "CHANNEL_OPEN_RESPONSE");

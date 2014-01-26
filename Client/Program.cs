@@ -18,6 +18,7 @@ using SecureSocketProtocol2.Plugin;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Network.Protections.Encryption;
 using SecureSocketProtocol2.Network.Protections.Masks;
+using TestPlugin;
 
 namespace Client
 {
@@ -186,7 +187,7 @@ namespace Client
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
 
 
-            while (true)
+            while (false)
             {
                 Console.WriteLine("Synchronized Server Time: " + base.TimeSync.Hour.ToString("D2") + ":" + base.TimeSync.Minute.ToString("D2") + ":" + base.TimeSync.Second.ToString("D2") + ", " + base.TimeSync.Millisecond);
                 Thread.Sleep(1000);
@@ -209,7 +210,7 @@ namespace Client
                 {
                     while (true)
                     {
-                        channel.SendPacket(message);
+                        channel.SendMessage(message);
                     }
                     channel.CloseChannel();
                     ChannelsClosed++;
@@ -222,8 +223,6 @@ namespace Client
                 }
             }
 
-            TestMessage msg = new TestMessage() { Stuff = buffer };
-            rnd.NextBytes(buffer);
             RandomDecimal rndDec = new RandomDecimal(DateTime.Now.Millisecond);
 
             while (true)
@@ -231,15 +230,16 @@ namespace Client
                 //msg.Stuff = new byte[rnd.Next(1, 65535)];
                 //rnd.NextBytes(buffer);
                 packets++;
-                DataPerSec += (ulong)msg.Stuff.Length;
+                /*DataPerSec += (ulong)message.Stuff.Length;
                 msg.Graf++;
-                msg.PauperGraf++;
+                msg.PauperGraf++;*/
                 //rnd.NextBytes(msg.Stuff);
-                base.SendUdpMessage(msg);
+                //base.SendUdpMessage(message);
+                base.SendMessage(message);
 
                 if (sw.ElapsedMilliseconds >= 1000)
                 {
-                    Console.WriteLine("last data size: " + msg.Stuff.Length + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
+                    Console.WriteLine("last data size: " + message.RawSize + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
                     packets = 0;
                     DataPerSec = 0;
                     sw = Stopwatch.StartNew();
@@ -323,7 +323,7 @@ namespace Client
         {
             return new IPlugin[]
             {
-
+                new TestPlug()
             };
         }
 

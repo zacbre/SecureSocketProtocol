@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Network;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -36,7 +37,7 @@ namespace SecureSocketProtocol2.Misc
         /// <summary>
         /// The string representation/packet.
         /// </summary>
-        string representation;
+        byte[] representation;
 
         /// <summary>
         /// Gets the final key to use for encryption.
@@ -73,18 +74,16 @@ namespace SecureSocketProtocol2.Misc
             g = BigInteger.genPseudoPrime(bits, 30, random);
 
             // Gemerate the string.
-            StringBuilder rep = new StringBuilder();
-            rep.Append(prime.ToString(36));
-            rep.Append("|");
-            rep.Append(g.ToString(36));
-            rep.Append("|");
-
+            PayloadWriter pw = new PayloadWriter();
+            pw.WriteBigInteger(prime);
+            pw.WriteBigInteger(g);
+            
             // Generate the send BigInt.
             using (BigInteger send = g.modPow(mine, prime))
             {
-                rep.Append(send.ToString(36));
+                pw.WriteBigInteger(send);
             }
-            representation = rep.ToString();
+            representation = pw.ToByteArray();
             return this;
         }
 
@@ -93,17 +92,15 @@ namespace SecureSocketProtocol2.Misc
         /// </summary>
         /// <param name="request">The string representation of the request.</param>
         /// <returns></returns>
-        public DiffieHellman GenerateResponse(string request)
+        public DiffieHellman GenerateResponse(PayloadReader pr)
         {
-            string[] parts = request.Split('|');
-
             // Generate the would-be fields.
-            using (BigInteger prime = new BigInteger(parts[0], 36))
-            using (BigInteger g = new BigInteger(parts[1], 36))
+            using (BigInteger prime = pr.ReadBigInteger())
+            using (BigInteger g = pr.ReadBigInteger())
             using (BigInteger mine = BigInteger.genPseudoPrime(bits, 30, random))
             {
                 // Generate the key.
-                using (BigInteger given = new BigInteger(parts[2], 36))
+                using (BigInteger given = pr.ReadBigInteger())
                 using (BigInteger key = given.modPow(mine, prime))
                 {
                     this.key = key.getBytes();
@@ -111,7 +108,9 @@ namespace SecureSocketProtocol2.Misc
                 // Generate the response.
                 using (BigInteger send = g.modPow(mine, prime))
                 {
-                    this.representation = send.ToString(36);
+                    PayloadWriter pw = new PayloadWriter();
+                    pw.WriteBigInteger(send);
+                    this.representation = pw.ToByteArray();
                 }
             }
 
@@ -122,10 +121,10 @@ namespace SecureSocketProtocol2.Misc
         /// Generates the key after a response is received.
         /// </summary>
         /// <param name="response">The string representation of the response.</param>
-        public void HandleResponse(string response)
+        public void HandleResponse(PayloadReader pr)
         {
             // Get the response and modpow it with the stored prime.
-            using (BigInteger given = new BigInteger(response, 36))
+            using (BigInteger given = pr.ReadBigInteger())
             using (BigInteger key = given.modPow(mine, prime))
             {
                 this.key = key.getBytes();
@@ -133,9 +132,9 @@ namespace SecureSocketProtocol2.Misc
             Dispose();
         }
 
-        public override string ToString()
+        public byte[] GetDiffie()
         {
-            return representation;
+            return this.representation;
         }
 
         /// <summary>

@@ -34,7 +34,7 @@ namespace SecureSocketProtocol2.Network
         {
             get
             {
-                return (int)(25 + protection.LayerCount + Client.HeaderTrashCount);
+                return (int)(29 + protection.LayerCount + Client.HeaderTrashCount);
             }
         }
 
@@ -57,7 +57,7 @@ namespace SecureSocketProtocol2.Network
 
         //just some queue's to make everything more simple
         //just also incase you want to open/close channels while you're receiving data
-        private TaskQueue<IMessage> ChannelPayloadQueue;
+        private TaskQueue<ChannelRecvInfo> ChannelPayloadQueue;
         private TaskQueue<IMessage> CloseChannelQueue;
         private TaskQueue<IMessage> DisconnectedQueue;
         private TaskQueue<IMessage> OpenChannelQueue;
@@ -96,7 +96,7 @@ namespace SecureSocketProtocol2.Network
             this.Client.Handle.NoDelay = true;
 
             this.packetQueue = new PacketQueue(this);
-            this.ChannelPayloadQueue = new TaskQueue<IMessage>(client, onChannelPayloadQueue, 100);
+            this.ChannelPayloadQueue = new TaskQueue<ChannelRecvInfo>(client, onChannelPayloadQueue, 100);
             this.CloseChannelQueue = new TaskQueue<IMessage>(client, onCloseChannelQueue, 100);
             this.DisconnectedQueue = new TaskQueue<IMessage>(client, onDisconnectedQueue, 100);
             this.OpenChannelQueue = new TaskQueue<IMessage>(client, onOpenChannelQueue, 100);
@@ -295,7 +295,7 @@ namespace SecureSocketProtocol2.Network
                                 catch (Exception ex)
                                 {
                                     Client.onException(ex);
-                                    continue;
+                                    return;
                                 }
 
                                 if (!Client.DPI.Inspect(null, message))
@@ -327,7 +327,7 @@ namespace SecureSocketProtocol2.Network
                                     }
                                     case PacketId.ChannelPayload:
                                     {
-                                        ChannelPayloadQueue.Enqueue(message);
+                                        ChannelPayloadQueue.Enqueue(new ChannelRecvInfo(message, stream.NetworkPayload.Header.ChannelId));
                                         break;
                                     }
                                     case PacketId.CloseChannel:
@@ -387,11 +387,26 @@ namespace SecureSocketProtocol2.Network
             this.KeepAliveSW = Stopwatch.StartNew();
             Client.onKeepAlive();
         }
-        private void onChannelPayloadQueue(IMessage message)
+        private void onChannelPayloadQueue(ChannelRecvInfo channelInfo)
         {
-            MsgChannelPayload msg = message as MsgChannelPayload;
-            if ((msg = message as MsgChannelPayload) != null)
-                msg.ProcessPayload(Client);
+            lock (Client.channels)
+            {
+                Channel channel = null;
+                if (Client.channels.TryGetValue(channelInfo.ChannelId, out channel))
+                {
+                    try
+                    {
+                        if (channel.State == ConnectionState.Open)
+                        {
+                            channel.onReceiveMessage(channelInfo.Message);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Client.onException(ex);
+                    }
+                }
+            }
         }
         private void onCloseChannelQueue(IMessage message)
         {
@@ -521,24 +536,26 @@ namespace SecureSocketProtocol2.Network
             }
         }
 
-        internal void SendPacket(IMessage message, PacketId packetId, bool compress = true, bool cache = true)
+        internal void SendPacket(IMessage message, PacketId packetId, bool compress = true, bool cache = true, Channel channel = null)
         {
             lock (Client)
             {
                 //clear the packet queue by sending all the stuff that had to be sended
                 packetQueue.CleanQueue();
-                SendPayload(message, packetId, null, compress, cache);
+                SendPayload(message, packetId, null, compress, cache, null, channel);
             }
         }
 
-        internal unsafe void SendPayload(IMessage message, PacketId packetId, IPlugin plugin = null, bool compress = true, bool cache = true, PluginHeaderCallback HeaderCallback = null)
+        internal unsafe void SendPayload(IMessage message, PacketId packetId, IPlugin plugin = null, bool compress = true, bool cache = true,
+                                         PluginHeaderCallback HeaderCallback = null, Channel channel = null)
         {
             NetworkPayloadWriter temp = message.WritePacket(message, this, plugin, HeaderCallback);
             message.RawSize = temp.Length - HEADER_SIZE;
-            SendPayload(temp, messageHandler.GetMessageId(message.GetType()), packetId, plugin, compress, cache);
+            SendPayload(temp, messageHandler.GetMessageId(message.GetType()), packetId, plugin, compress, cache, channel);
         }
 
-        private unsafe void SendPayload(NetworkPayloadWriter npw, uint MessageId, PacketId packetId, IPlugin plugin = null, bool compress = true, bool cache = true)
+        private unsafe void SendPayload(NetworkPayloadWriter npw, uint MessageId, PacketId packetId, IPlugin plugin = null,
+                                        bool compress = true, bool cache = true, Channel channel = null)
         {
             lock (ClientSendLock)
             {
@@ -557,6 +574,7 @@ namespace SecureSocketProtocol2.Network
 
                 header.PacketSize = (int)PayloadLength;
                 header.PacketID = packetId;
+                header.ChannelId = channel != null ? channel.ConnectionId : 0;
                 
                 if (packetId == PacketId.PluginPacket)
                 {

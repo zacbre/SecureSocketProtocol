@@ -8,7 +8,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     internal class MsgOpenChannelResponse : IMessage
     {
-        public ulong ConnectionId;
+        public uint ConnectionId;
         public bool success;
 
         public MsgOpenChannelResponse()
@@ -17,7 +17,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 
         }
 
-        public MsgOpenChannelResponse(ulong connectionId, bool success)
+        public MsgOpenChannelResponse(uint connectionId, bool success)
             : base()
         {
             this.ConnectionId = connectionId;

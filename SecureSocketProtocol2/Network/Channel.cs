@@ -9,36 +9,28 @@ namespace SecureSocketProtocol2.Network
     public abstract class Channel
     {
         public Connection Connection { get; internal set; }
-        internal ulong ConnectionId { get; set; }
+        public uint ConnectionId { get; internal set; }
         public ConnectionState State { get; internal set; }
         public SSPClient Client { get; internal set; }
 
         public abstract void onChannelOpen();
         public abstract void onChannelClosed();
-        public abstract void onReceiveData(IMessage message);
+        public abstract void onReceiveMessage(IMessage message);
 
         public Channel()
         {
 
         }
 
-        public ChannelError SendPacket(IMessage message)
+        public ChannelError SendMessage(IMessage message)
         {
             try
             {
                 lock(Connection)
                 {
-                    //todo: need to look at channels soon, haven't worked at channels for a while
-                    /*if (State == ConnectionState.Closed)
+                    if (State == ConnectionState.Closed)
                         return ChannelError.ChannelClosed;
-
-                    int size = 0;
-                    uint MsgId = Connection.messageHandler.GetMessageId(message.GetType());
-                    byte[] msgData = message.WritePacket(message, ref size);
-                    Array.Resize(ref msgData, size);
-
-                    MsgChannelPayload payloadMessage = new MsgChannelPayload(this, msgData, MsgId);
-                    Connection.SendPacket(payloadMessage, PacketId.ChannelPayload);*/
+                    Connection.SendPacket(message, PacketId.ChannelPayload, true, true, this);
                 }
             }
             catch(Exception ex)

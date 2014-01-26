@@ -53,6 +53,10 @@
       <Project>{158d26c2-6132-4285-b99a-b42383a10c3b}</Project>
       <Name>SecureSocketProtocol2</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestPlugin\TestPlugin.csproj">
+      <Project>{dfdd25ed-3d7f-4871-a6ce-8bfb84944706}</Project>
+      <Name>TestPlugin</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

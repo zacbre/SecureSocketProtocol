@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Misc;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -100,6 +101,13 @@ namespace SecureSocketProtocol2.Network
             byte[] serialized = serializer.Serialize(obj);
             WriteInteger(serialized.Length);
             WriteBytes(serialized);
+        }
+
+        public void WriteBigInteger(BigInteger BigInt)
+        {
+            byte[] temp = BigInt.getBytes();
+            WriteByte((byte)temp.Length);
+            WriteBytes(temp);
         }
 
         public byte[] ToByteArray()

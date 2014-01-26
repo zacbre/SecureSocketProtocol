@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Misc;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -142,6 +143,12 @@ namespace SecureSocketProtocol2.Network
         public T ReadObject<T>()
         {
             return (T)ReadObject();
+        }
+
+        public BigInteger ReadBigInteger()
+        {
+            int length = ReadByte();
+            return new BigInteger(ReadBytes(length));
         }
 
         public byte[] Packet

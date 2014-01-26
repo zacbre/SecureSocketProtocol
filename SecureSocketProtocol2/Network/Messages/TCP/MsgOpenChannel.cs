@@ -8,7 +8,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     internal class MsgOpenChannel : IMessage
     {
-        public ulong ConnectionId;
+        public uint ConnectionId;
 
         public MsgOpenChannel()
             : base()
@@ -24,9 +24,9 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
                 lock (connection.Client.channels)
                 {
                     Random rnd = new Random(DateTime.Now.Millisecond);
-                    ulong ConnectionId = (ulong)(rnd.Next() * rnd.Next());
-                    while (connection.Client.channels.ContainsKey(ConnectionId))
-                        ConnectionId = (ulong)(rnd.Next() * rnd.Next());
+                    uint ConnectionId = (uint)(rnd.Next() * rnd.Next());
+                    while (connection.Client.channels.ContainsKey(ConnectionId) || ConnectionId == 0)
+                        ConnectionId = (uint)(rnd.Next() * rnd.Next());
 
                     bool success = false;
                     Channel channel = null;

@@ -172,4 +172,14 @@ namespace SecureSocketProtocol2
     {
         None, CRC32, MurMur, MD5
     }
+
+    public enum HandshakeType
+    {
+        Unknown = 0,
+        OK,
+        /// <summary> Shows the client/server it will wait for a message </summary>
+        ReceiveMessage,
+        /// <summary> Shows the client/server we will send a message </summary>
+        SendMessage,
+    }
 }

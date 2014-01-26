@@ -19,6 +19,7 @@ using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Network.Messages.UDP;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Handshake;
 
 namespace SecureSocketProtocol2
 {
@@ -75,8 +76,9 @@ namespace SecureSocketProtocol2
         public decimal ClientId { get; internal set; }
         public bool ReconnectAtDisconnect { get; set; }
         public bool ServerAllowsReconnecting { get; internal set; }
-        private DiffieHellman diffieHellman;
         internal bool CompletedHandshake { get; private set; }
+        public CertInfo Certificate { get; internal set; }
+        internal bool UseUDP { get; set; } //it's being used in the HandShake
 
         /// <summary>
         /// A server-client time synchronisation, Server takes the lead in having the time.
@@ -94,33 +96,27 @@ namespace SecureSocketProtocol2
                 this._timeSync = value;
             }
         }
-        private DateTime _timeSync;
-        private Stopwatch TimeSyncSW; //used for updating the TimeSync
+        internal DateTime _timeSync;
+        internal Stopwatch TimeSyncSW; //used for updating the TimeSync
 
         /// <summary> This object is only being used client-sided </summary>
         private SocketAsyncEventArgs UdpAsyncReceiveEvent;
-        private SyncObject UdpSyncObject;
-        public CertInfo Certificate { get; private set; }
+        internal SyncObject UdpSyncObject;
 
         /// <summary>
         /// Shows to which side he belongs, Running at the Server or is it a Client
         /// </summary>
         public PeerSide PeerSide { get; private set; }
 
-        public byte[] PrivateKey
-        {
-            get { return diffieHellman.Key; }
-        }
-
         /// <summary>
         /// A random seed that was provied by the server
         /// </summary>
-        public uint Seed { get; private set; }
+        public uint Seed { get { return Connection.messageHandler.Seed; } }
 
         /// <summary>
         /// The Token is being used as security ID to identify the client
         /// </summary>
-        internal decimal Token { get; private set; }
+        internal decimal Token { get; set; }
         internal bool ConnectionClosedNormal = false;
         internal ClientProperties Properties;
 
@@ -197,7 +193,6 @@ namespace SecureSocketProtocol2
             this.ReconnectAtDisconnect = AllowReconnect;
             this.baseChannel = BaseChannel;
             this.baseChannelArgs = BaseChannelArgs;
-            this.diffieHellman = new DiffieHellman(256);
         }
 
         /// <summary>
@@ -387,6 +382,8 @@ namespace SecureSocketProtocol2
         private bool CreateHandshake(string HostIp, ushort Port, IPlugin[] Plugins)
         {
             this.PeerSide = SecureSocketProtocol2.PeerSide.Client;
+            bool UseUdp = false;
+            SyncObject syncObject = null;
 
             //apply private key
             Connection.protection.ApplyPrivateKey(Properties.PrivateKey);
@@ -410,240 +407,14 @@ namespace SecureSocketProtocol2
                 }
             }
 
-            Connection.SendPacket(new MsgValidation(Connection.VALIDATION), PacketId.Unknown);
-            SyncObject syncObject = null;
-            bool UseUdp = false;
-
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgValidation validation = message as MsgValidation;
-                if (validation != null)
-                    return validation.ValidationSuccess;
-                return false;
-            })).Wait<bool>(false, 30000))
+            ClientSideHandshake handShake = new ClientSideHandshake(this, Properties);
+            if (!handShake.DoHandshake())
             {
                 Disconnect();
-                if (syncObject.TimedOut)
-                    throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                throw new Exception("Incorrect signature");
+                throw new Exception("An unexpected error occured in the HandShake");
             }
 
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgMessageSeed mms = message as MsgMessageSeed;
-
-                if (mms != null)
-                {
-                    this.Seed = mms.Seed;
-                    Connection.messageHandler.RegisterMessages(mms.Seed);
-                    return true;
-                }
-                return false;
-            })).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                if (syncObject.TimedOut)
-                    throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                throw new Exception("Failed to retrieve the message seed.");
-            }
-
-            //wait for RSA from server
-            RSAEncryption RSA = null;
-            if (!Connection.Receive((IMessage message) =>
-            {
-                MsgRsaPublicKey rsaKey = message as MsgRsaPublicKey;
-
-                if (rsaKey != null)
-                {
-                    RSA = new RSAEncryption(Connection.RSA_KEY_SIZE, "", rsaKey.PublicKey, true); // <- private key not public, don't get confused of the argument ITS PRIVATE KEY
-                    return true;
-                }
-                return false;
-            }).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                return false;
-            }            
-
-            bool BlockedCertificate = false;
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgServerEncryption mse = message as MsgServerEncryption;
-
-                if (mse != null)
-                {
-                    UseUdp = mse.UseUdp;
-
-                    //read the Diffie-Hellman key
-                    long index = PrivateKeyOffset % 65535;
-                    if (index <= 4)
-                        index = 10;
-
-                    byte[] diffieLen = new byte[4];
-                    Array.Copy(mse.Key, index - 4, diffieLen, 0, diffieLen.Length);
-                    byte[] diffieData = new byte[BitConverter.ToInt32(diffieLen, 0)];
-                    Array.Copy(mse.Key, index, diffieData, 0, diffieData.Length); //copy the diffie-hellman key in between random data
-
-                    //fix RSA Encrypted Data
-                    Array.Copy(mse.Key, mse.Key.Length - (diffieLen.Length + diffieData.Length), mse.Key, index-4, diffieLen.Length + diffieData.Length);
-                    Array.Resize(ref mse.Key, mse.Key.Length - (diffieLen.Length + diffieData.Length)); //set original size back
-
-                    //check if key is original
-                    uint KeyHash = BitConverter.ToUInt32(new CRC32().ComputeHash(mse.Key), 0);
-
-                    string DiffieKey = ASCIIEncoding.ASCII.GetString(diffieData);
-                    diffieHellman.GenerateResponse(DiffieKey);
-                    this.Certificate = mse.certificate;
-
-                    if (!onVerifyCertificate(mse.certificate))
-                    {
-                        BlockedCertificate = true;
-                        return false;
-                    }
-
-                    Connection.SendPacket(new MsgDiffiehellman(diffieHellman.ToString()), PacketId.Unknown);
-                    Connection.protection.ApplyPrivateKey(diffieHellman.Key); //apply salt key
-                    mse.Key = RSA.Decrypt(mse.Key, 0, mse.Key.Length);//decrypt key
-                    Connection.protection.ApplyPrivateKey(mse.Key); //apply secure key
-                    return true;
-                }
-                return false;
-            })).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                if (!BlockedCertificate)
-                {
-                    if (syncObject.TimedOut)
-                        throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                    throw new Exception("Diffie-Hellman key-exchange failed.");
-                }
-                throw new Exception("The certificate provided by the server was blocked by the user");
-            }
-
-            //let's do the user/pass authenication
-            if ((Properties.Username != null && Properties.Username.Length > 0) &&
-                (Properties.Password != null && Properties.Password.Length > 0))
-            {
-                Connection.SendPacket(new MsgAuthenication(Properties.Username, Properties.Password), PacketId.Unknown);
-                if (!(syncObject = Connection.Receive((IMessage message) =>
-                {
-                    MsgAuthenicationSuccess authResponse = message as MsgAuthenicationSuccess;
-
-                    if (authResponse != null)
-                    {
-                        return authResponse.Success;
-                    }
-                    return false;
-                })).Wait<bool>(false, 30000))
-                {
-                    Disconnect();
-                    if (syncObject.TimedOut)
-                        throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                    throw new Exception("Username or Password is incorrect");
-                }
-            }
-            Connection.SendPacket(new MsgOk(), PacketId.Unknown); //tell the server it's ok
-
-            //do a time synchronisation
-            bool QuitSyncLoop = false;
-            for (int i = 0; i < 10; i++) //only give it 10 tries
-            {
-                if (!(syncObject = Connection.Receive((IMessage message) =>
-                {
-                    MsgTimeSync time = message as MsgTimeSync;
-
-                    if (time != null)
-                    {
-                        this._timeSync = DateTime.FromBinary(time.Time);
-                        this.TimeSyncSW = Stopwatch.StartNew();
-                        Connection.SendPacket(new MsgTimeSyncResponse(this.TimeSync.ToBinary()), PacketId.Unknown);
-                        return true;
-                    }
-                    else
-                    {
-                        //if we receive MsgOK then we can quit synchronizing the time
-                        if (message as MsgOk != null)
-                        {
-                            QuitSyncLoop = true;
-                            return true;
-                        }
-                    }
-                    return false;
-                })).Wait<bool>(false, 15000))
-                {
-                    Disconnect();
-                    if (syncObject.TimedOut)
-                        throw new Exception("A timeout occured, this means the server did not respond for ~10 seconds");
-                    throw new Exception("Failed to synchronize the time with the server");
-                }
-                if (QuitSyncLoop)
-                    break;
-            }
-
-
-            try
-            {
-                //at this point you could use extra keyfiles or other security measures
-                onAuthenticated();
-            }
-            catch (Exception ex)
-            {
-                onException(ex);
-            }
-
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgClientInfo mci = message as MsgClientInfo;
-
-                if (mci != null)
-                {
-                    this.ClientId = mci.ClientId;
-                    this.Token = mci.Token;
-
-                    if (UseUdp)
-                    {
-                        this.UdpHandshakeCode = mci.UdpHandshakeCode;
-                    }
-                    return true;
-                }
-                return false;
-            })).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                if (syncObject.TimedOut)
-                    throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                throw new Exception("Failed to retrieve the Client Id");
-            }
-
-            //let's process now the UDP protocol
-            if (UseUdp)
-            {
-                this.UdpEndPoint = new IPEndPoint(IPAddress.Parse(HostIp), Port);
-                this.UdpHandle = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                SyncObject udpSync = Connection.Receive(onClientUdpHandshake);
-                bool UdpSuccess = false;
-
-                //if the 10 tries failed we wasted 50 seconds of our life :c
-                for (int i = 0; i < 10; i++)
-                {
-                    SendUdpMessage(new MsgUdpHandshake(this.UdpHandshakeCode), UdpPAcketId.Handshake);
-                    if (udpSync.Wait<bool>(false, 5000))
-                    {
-                        UdpSuccess = true;
-                        break;
-                    }
-                }
-
-                if (!UdpSuccess)
-                {
-                    Disconnect();
-                    throw new Exception("The server did not respond in time to acknowledge the UDP connection");
-                }
-                this.UdpHandshaked = true;
-            }
-
-            this.MessageHandler.ResetMessages();
-
+            /*
             //handple plugins
             int PluginCount = 0;
             if (!(syncObject = Connection.Receive((IMessage message) =>
@@ -761,7 +532,7 @@ namespace SecureSocketProtocol2
                 if (syncObject.TimedOut)
                     throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
                 throw new Exception("Failed to retrieve an handshake acknowledgement");
-            }
+            }*/
 
             this.CompletedHandshake = true;
             onValidatingComplete();
@@ -805,7 +576,7 @@ namespace SecureSocketProtocol2
                         byte[] data = new byte[32768];
                         int read = stream.Read(data, 0, data.Length);
 
-                        if (read == 0)
+                        if (read <= 0)
                             break;
 
                         Array.Resize(ref data, read);
@@ -814,248 +585,14 @@ namespace SecureSocketProtocol2
                 }
             }
 
-            if (!Connection.Receive((IMessage message) =>
-            {
-                MsgValidation validation = message as MsgValidation;
-
-                if (validation != null)
-                {
-                    if (validation.ValidationKey.Length != Connection.VALIDATION.Length)
-                        return false;
-
-                    fixed (byte* ptr = validation.ValidationKey, ptr2 = Connection.VALIDATION)
-                    {
-                        if (NativeMethods.memcmp(ptr, ptr2, (uint)Connection.VALIDATION.Length) == 0)
-                        {
-                            Connection.SendPacket(new MsgValidation(true), PacketId.Unknown);
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }).Wait<bool>(false, 30000))
+            ServerSideHandshake handShake = new ServerSideHandshake(this, serverProperties, UdpClient, getClientsDelegate, KeyHandler);
+            if (!handShake.DoHandshake())
             {
                 Disconnect();
-                return false;
-            }
-            onValidatingComplete();
-
-            //register the message
-            Connection.messageHandler.RegisterMessages(0); //set seed 0 so it generates a new seed
-            this.Seed = Connection.messageHandler.Seed;
-            Connection.SendPacket(new MsgMessageSeed(Connection.messageHandler.Seed), PacketId.Unknown);
-
-
-
-
-
-
-
-
-
-
-            RSAEncryption RSA = KeyHandler.GetPrivateKey();
-            Connection.SendPacket(new MsgRsaPublicKey(RSA.PrivateKey), PacketId.Unknown); //<- private key
-
-            //generate a big random key
-            byte[] encryptionKey = new byte[65535];
-            new Random(DateTime.Now.Millisecond).NextBytes(encryptionKey);
-
-            //encrypt the key with RSA
-            byte[] cryptedKey = RSA.Encrypt(encryptionKey, 0, encryptionKey.Length);
-            uint KeyHash = BitConverter.ToUInt32(new CRC32().ComputeHash(cryptedKey), 0);
-
-            diffieHellman = KeyHandler.GetDiffieHellman();
-            byte[] diffieStr = ASCIIEncoding.ASCII.GetBytes(diffieHellman.ToString());
-            long index = PrivateKeyOffset % cryptedKey.Length;
-            if (index <= 4)
-                index = 10;
-            byte[] diffieLen = BitConverter.GetBytes(diffieStr.Length);
-
-            //create a backup of encrypted RSA data
-            byte[] RsaBackup = new byte[diffieLen.Length + diffieStr.Length];
-            Array.Copy(cryptedKey, index-4, RsaBackup, 0, RsaBackup.Length); //Rsa Backup Data
-            Array.Copy(diffieLen, 0, cryptedKey, index-4, diffieLen.Length); //write Diffie-Hellman key length
-            Array.Copy(diffieStr, 0, cryptedKey, index, diffieStr.Length); //copy the diffie-hellman key in between random data
-            
-            //maybe not secure adding this at the end of the encrypted data but whatever for now
-            Array.Resize(ref cryptedKey, cryptedKey.Length + RsaBackup.Length);
-            Array.Copy(RsaBackup, 0, cryptedKey, cryptedKey.Length - RsaBackup.Length, RsaBackup.Length);
-
-
-            CertInfo certificate = new CertInfo(serverProperties.ServerCertificate);
-            certificate.FingerPrintMd5 = BitConverter.ToString(MD5.Create().ComputeHash(serverProperties.ServerCertificate.PrivateKey)).Replace("-", "");
-            certificate.FingerPrintSha1 = BitConverter.ToString(SHA1.Create().ComputeHash(serverProperties.ServerCertificate.PrivateKey)).Replace("-", "");
-            certificate.KeyAlgorithm = "RSA with " + Connection.RSA_KEY_SIZE + "bit";
-            certificate.Compression = "";//serverProperties.Compression.ToString();
-            certificate.Cipher = "";// serverProperties.Encryption.ToString();
-            certificate.HandshakeMethod = "RSA" + Connection.RSA_KEY_SIZE + "-DiffieHellman-AES256";
-
-            if (!serverProperties.ServerCertificate.ShowProtectionMethods)
-            {
-                certificate.Cipher = "";
-                certificate.Checksum = ChecksumHash.None;
-                certificate.Compression = "";
-                certificate.HandshakeMethod = "";
-                certificate.KeyAlgorithm = "";
+                throw new Exception("An unexpected error occured in the HandShake");
             }
 
-            this.Certificate = certificate;
-            Connection.SendPacket(new MsgServerEncryption(serverProperties.AllowUdp, certificate, cryptedKey, KeyHash), PacketId.Unknown);
-
-
-            if (!Connection.Receive((IMessage message) =>
-            {
-                MsgDiffiehellman diffie = message as MsgDiffiehellman;
-
-                if (diffie != null)
-                {
-                    try
-                    {
-                        diffieHellman.HandleResponse(diffie.DiffieHellman);
-                        Connection.protection.ApplyPrivateKey(diffieHellman.Key); //apply salt-key
-                        Connection.protection.ApplyPrivateKey(encryptionKey); //apply secure key
-                        return true;
-                    }
-                    catch { return false; }
-                }
-                return false;
-            }).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                return false;
-            }
-
-
-            if (serverProperties.UserPassAuthenication)
-            {
-                if (!Connection.Receive((IMessage message) =>
-                {
-                    MsgAuthenication msgAuth = message as MsgAuthenication;
-                    if (msgAuth != null)
-                    {
-                        //todo: check password if it only contains the character it should have
-                        try
-                        {
-                            bool success = onAuthentication(msgAuth.Username, msgAuth.Password);
-                            Connection.SendPacket(new MsgAuthenicationSuccess(success), PacketId.Unknown);
-                        }
-                        catch
-                        {
-                            Connection.SendPacket(new MsgAuthenicationSuccess(false), PacketId.Unknown);
-                        }
-                        return true;
-                    }
-                    Connection.SendPacket(new MsgAuthenicationSuccess(false), PacketId.Unknown);
-                    return false;
-                }).Wait<bool>(false, 30000))
-                {
-                    Disconnect();
-                    return false;
-                }
-            }
-
-            //just to verify the packet
-            if (!Connection.Receive((IMessage message) =>
-            {
-                MsgOk msgOk = message as MsgOk;
-                if (msgOk != null)
-                    return true;
-                return false;
-            }).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                return false;
-            }
-
-            //do a time sync till it's correct at <=5 seconds after 10 tries
-            for (int i = 0; i < 10; i++)
-            {
-                Stopwatch TimeSW = Stopwatch.StartNew();
-                Connection.SendPacket(new MsgTimeSync(DateTime.Now), PacketId.Unknown);
-
-                if (!Connection.Receive((IMessage message) =>
-                {
-                    MsgTimeSyncResponse response = message as MsgTimeSyncResponse;
-                    if (response != null)
-                    {
-                        DateTime ResponseTime = DateTime.FromBinary(response.Time);
-                        DateTime TimeNow = DateTime.Now;
-
-                        if (ResponseTime > DateTime.Now)
-                        {
-                            //something went wrong... shouldn't be possible
-                            return false;
-                        }
-                        else
-                        {
-                            if (TimeNow.Year != ResponseTime.Year || TimeNow.Month != ResponseTime.Month || TimeNow.Day != ResponseTime.Day ||
-                                TimeNow.Hour != ResponseTime.Hour)
-                            {
-                                return false;
-                            }
-                            else
-                            {
-                                //check seconds difference
-                                if (TimeNow.Subtract(ResponseTime).Seconds <= 5)
-                                {
-                                    Connection.SendPacket(new MsgOk(), PacketId.Payload);
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                    return false;
-                }).Wait<bool>(false, 10000))
-                {
-                    if (i + 1 >= 10)
-                    {
-                        Disconnect();
-                        return false;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            try
-            {
-                //at this point you could use extra keyfiles or other security measures
-                onAuthenticated();
-            }
-            catch (Exception ex)
-            {
-                onException(ex);
-            }
-
-            Random rnd = new Random(DateTime.Now.Millisecond);
-            if (serverProperties.AllowUdp)
-            {
-                this.UdpHandshakeCode = new byte[50];
-                rnd.NextBytes(this.UdpHandshakeCode);
-            }
-
-            this.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();
-            Connection.SendPacket(new MsgClientInfo(this.ClientId, this.UdpHandshakeCode, this.Token), PacketId.Unknown);
-            
-
-            if (serverProperties.AllowUdp)
-            {
-                //let's process the UDP protocol
-                this.UdpHandle = UdpClient;
-                this.UdpSyncObject = new SyncObject(Connection);
-
-                if (!this.UdpSyncObject.Wait<bool>(false, 30000))
-                {
-                    Disconnect();
-                    return false;
-                }
-            }
-
-            this.MessageHandler.ResetMessages();
-
+            /*
             IPlugin[] plugins = onGetPlugins();
             Connection.SendPacket(new MsgPluginCount(plugins.Length), PacketId.Unknown);
             foreach (IPlugin plugin in plugins)
@@ -1112,7 +649,7 @@ namespace SecureSocketProtocol2
             {
                 Disconnect();
                 return false;
-            }
+            }*/
 
             this.CompletedHandshake = true;
             this.Connection.KeepAliveSW = Stopwatch.StartNew();

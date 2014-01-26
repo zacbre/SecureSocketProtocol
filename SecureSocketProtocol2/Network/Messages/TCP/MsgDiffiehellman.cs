@@ -6,7 +6,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     internal class MsgDiffiehellman : IMessage
     {
-        public string DiffieHellman;
+        public byte[] DiffieHellman;
 
         public MsgDiffiehellman()
             : base()
@@ -14,7 +14,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 
         }
 
-        public MsgDiffiehellman(string diffie)
+        public MsgDiffiehellman(byte[] diffie)
             : base()
         {
             this.DiffieHellman = diffie;

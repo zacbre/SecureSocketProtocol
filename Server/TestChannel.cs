@@ -31,7 +31,7 @@ namespace Server
             //Console.WriteLine("Test channel has being closed");
         }
 
-        public override void onReceiveData(IMessage message)
+        public override void onReceiveMessage(IMessage message)
         {
             Received += message.RawSize;
             PacketsPerSec++;

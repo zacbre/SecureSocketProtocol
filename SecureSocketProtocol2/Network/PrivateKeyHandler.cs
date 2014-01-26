@@ -58,7 +58,6 @@ namespace SecureSocketProtocol2.Network
 
         public DiffieHellman GetDiffieHellman()
         {
-            
             if (DiffieHellmans.Count == 0)
             {
                 if (GenThread == null)
@@ -89,24 +88,31 @@ namespace SecureSocketProtocol2.Network
 
         private void GenerateThread()
         {
-            while (PrivateKeys.Count < Max_Private_Keys || DiffieHellmans.Count < Max_Private_Keys)
+            try
             {
-                if (PrivateKeys.Count < Max_Private_Keys)
+                while (PrivateKeys.Count < Max_Private_Keys || DiffieHellmans.Count < Max_Private_Keys)
                 {
-                    RSAEncryption RSA = GenerateRsaKey();
-                    lock (PrivateKeys)
+                    if (PrivateKeys.Count < Max_Private_Keys)
                     {
-                        PrivateKeys.Add(RSA);
+                        RSAEncryption RSA = GenerateRsaKey();
+                        lock (PrivateKeys)
+                        {
+                            PrivateKeys.Add(RSA);
+                        }
+                    }
+                    if (DiffieHellmans.Count < Max_Private_Keys)
+                    {
+                        DiffieHellman diffie = GenerateDiffieHellman();
+                        lock (DiffieHellmans)
+                        {
+                            DiffieHellmans.Add(diffie);
+                        }
                     }
                 }
-                if (DiffieHellmans.Count < Max_Private_Keys)
-                {
-                    DiffieHellman diffie = GenerateDiffieHellman();
-                    lock (DiffieHellmans)
-                    {
-                        DiffieHellmans.Add(diffie);
-                    }
-                }
+            }
+            catch
+            {
+
             }
             GenThread = null;
         }

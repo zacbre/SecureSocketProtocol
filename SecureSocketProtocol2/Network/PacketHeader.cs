@@ -16,6 +16,7 @@ namespace SecureSocketProtocol2.Network
         public bool isPluginPacket { get; set; }
         public ushort CurPacketId { get; set; }
         public uint Hash { get; set; }
+        public uint ChannelId { get; set; }
         private Connection connection;
 
         public PacketHeader(byte[] header, int offset, Connection connection)
@@ -33,6 +34,7 @@ namespace SecureSocketProtocol2.Network
             isPluginPacket = pr.ReadBool();
             CurPacketId = pr.ReadUShort();
             Hash = pr.ReadUInteger();
+            ChannelId = pr.ReadUInteger();
         }
 
         public PacketHeader(Connection connection)
@@ -67,6 +69,7 @@ namespace SecureSocketProtocol2.Network
                 }
             }
             pw.WriteUInteger(Hash);
+            pw.WriteUInteger(ChannelId);
 
             //write protection data, if compressed/cached
             pw.WriteBytes(new byte[connection.protection.LayerCount]);

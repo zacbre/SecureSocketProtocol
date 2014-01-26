@@ -29,18 +29,18 @@ namespace Client
             //Console.WriteLine("Test channel has being closed");
         }
 
-        public override void onReceiveData(IMessage message)
+        public override void onReceiveMessage(IMessage message)
         {
-            /*PacketsPerSec++;
-            Received += data.Length;
+            PacketsPerSec++;
+            Received += message.RawSize;
 
             if(speedSW.ElapsedMilliseconds >= 1000)
             {
-                Console.WriteLine("[channel] last size: " + data.Length + ", Packet /sec:" + PacketsPerSec + ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]");
+                Console.WriteLine("[channel] last size: " + message.RawSize + ", Packet /sec:" + PacketsPerSec + ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]");
                 PacketsPerSec = 0;
                 Received = 0;
                 speedSW = Stopwatch.StartNew();
-            }*/
+            }
         }
     }
 }
