@@ -182,4 +182,12 @@ namespace SecureSocketProtocol2
         /// <summary> Shows the client/server we will send a message </summary>
         SendMessage,
     }
+
+    public enum ErrorType
+    {
+        /// <summary> When this occurs it's a error from the user and not from SSP </summary>
+        UserLand,
+        /// <summary> This is a SSP error which should get fixed </summary>
+        Core
+    }
 }

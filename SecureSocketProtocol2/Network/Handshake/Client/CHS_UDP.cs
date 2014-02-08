@@ -63,6 +63,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 if (!UdpSuccess)
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, CHS_UDP"), ErrorType.Core);
                     throw new Exception("The server did not respond in time to acknowledge the UDP connection");
                 }
                 Client.UdpHandshaked = true;

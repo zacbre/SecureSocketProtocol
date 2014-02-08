@@ -134,7 +134,7 @@ namespace SecureSocketProtocol2
                     }
                     catch (Exception ex)
                     {
-                        client.onException(ex);
+                        client.onException(ex, ErrorType.UserLand);
                     }
 
                     client.StartReceiver();

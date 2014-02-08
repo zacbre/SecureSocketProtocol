@@ -58,6 +58,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             })).Wait<bool>(false, 30000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, CHS_ClientInfo"), ErrorType.Core);
                 if (syncObject.TimedOut)
                     throw new TimeoutException(OutOfSyncMessage);
                 throw new Exception("Failed to retrieve the Client Id");

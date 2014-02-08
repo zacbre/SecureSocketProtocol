@@ -52,6 +52,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             })).Wait<bool>(false, 30000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, CHS_Seed"), ErrorType.Core);
                 if (syncObject.TimedOut)
                     throw new TimeoutException(TimeOutMessage);
                 throw new Exception("Failed to retrieve the message seed.");

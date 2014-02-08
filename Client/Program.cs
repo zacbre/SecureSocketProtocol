@@ -230,8 +230,8 @@ namespace Client
                 //msg.Stuff = new byte[rnd.Next(1, 65535)];
                 //rnd.NextBytes(buffer);
                 packets++;
-                /*DataPerSec += (ulong)message.Stuff.Length;
-                msg.Graf++;
+                DataPerSec += (ulong)message.Stuff.Length;
+                /*msg.Graf++;
                 msg.PauperGraf++;*/
                 //rnd.NextBytes(msg.Stuff);
                 //base.SendUdpMessage(message);
@@ -268,7 +268,7 @@ namespace Client
 
         }
 
-        public override void onException(Exception ex)
+        public override void onException(Exception ex, ErrorType errorType)
         {
 
         }

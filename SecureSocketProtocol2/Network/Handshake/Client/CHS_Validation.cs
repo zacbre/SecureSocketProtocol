@@ -51,11 +51,20 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             })).Wait<bool>(false, 30000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, CHS_Validation"), ErrorType.Core);
                 if (syncObject.TimedOut)
                     throw new TimeoutException(TimeOutMessage);
                 throw new Exception("Incorrect signature");
             }
 
+            try
+            {
+                Client.onValidatingComplete();
+            }
+            catch (Exception ex)
+            {
+                Client.onException(ex, ErrorType.UserLand);
+            }
             return true;
         }
     }

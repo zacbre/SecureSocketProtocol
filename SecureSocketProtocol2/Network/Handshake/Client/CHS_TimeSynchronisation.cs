@@ -57,6 +57,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             })).Wait<bool>(false, 15000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, CHS_TimeSynchronisation"), ErrorType.Core);
                 if (syncObject.TimedOut)
                     throw new TimeoutException(TimeOutMessage);
                 throw new Exception("Failed to synchronize the time with the server");

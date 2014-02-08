@@ -32,7 +32,7 @@ namespace SecureSocketProtocol2
         public abstract void onDisconnect();
         public abstract void onDeepPacketInspection(IMessage message);
         public abstract void onKeepAlive();
-        public abstract void onException(Exception ex);
+        public abstract void onException(Exception ex, ErrorType errorType);
         public abstract void onReconnect();
         public abstract void onNewChannelOpen(Channel channel);
         public abstract void onRegisterMessages(MessageHandler messageHandler);
@@ -296,7 +296,7 @@ namespace SecureSocketProtocol2
             }
             catch (Exception ex)
             {
-                onException(ex);
+                onException(ex, ErrorType.UserLand);
             }
 
             StartReceiver();
@@ -309,7 +309,7 @@ namespace SecureSocketProtocol2
                 }
                 catch (Exception ex)
                 {
-                    onException(ex);
+                    onException(ex, ErrorType.UserLand);
                 }
             }
         }
@@ -379,6 +379,15 @@ namespace SecureSocketProtocol2
             }
         }
 
+        public void ApplyPrivateKey(byte[] Key)
+        {
+            if (Key == null)
+                throw new ArgumentNullException("Key");
+            if (Key.Length < 16)
+                throw new ArgumentException("Key must be atleast 16 in length");
+            Connection.protection.ApplyPrivateKey(Key);
+        }
+
         private bool CreateHandshake(string HostIp, ushort Port, IPlugin[] Plugins)
         {
             this.PeerSide = SecureSocketProtocol2.PeerSide.Client;
@@ -386,7 +395,7 @@ namespace SecureSocketProtocol2
             SyncObject syncObject = null;
 
             //apply private key
-            Connection.protection.ApplyPrivateKey(Properties.PrivateKey);
+            ApplyPrivateKey(Properties.PrivateKey);
 
             //apply the KeyFiles
             if (Properties.KeyFiles != null)
@@ -402,7 +411,7 @@ namespace SecureSocketProtocol2
                             break;
 
                         Array.Resize(ref data, read);
-                        Connection.protection.ApplyPrivateKey(data);
+                        ApplyPrivateKey(data);
                     }
                 }
             }
@@ -413,129 +422,7 @@ namespace SecureSocketProtocol2
                 Disconnect();
                 throw new Exception("An unexpected error occured in the HandShake");
             }
-
-            /*
-            //handple plugins
-            int PluginCount = 0;
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgPluginCount MsgCount = message as MsgPluginCount;
-                if (MsgCount == null)
-                    return false;
-                PluginCount = MsgCount.PluginCount;
-                return true;
-            })).Wait<bool>(false))
-            {
-                Disconnect();
-                if (syncObject.TimedOut)
-                    throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                throw new Exception("Failed to retrieve the plugin information");
-            }
-
-            if(Plugins.Length != PluginCount)
-            {
-                Disconnect();
-                throw new Exception("The client is missing a few plugin(s), add the plugin(s) in order to connect");
-            }
-            for (int i = 0; i < PluginCount; i++)
-            {
-                bool FoundPlugin = false;
-                if (!(syncObject = Connection.Receive((IMessage message) =>
-                {
-                    MsgGetPluginInfo MsgInfo = message as MsgGetPluginInfo;
-                    if (MsgInfo == null)
-                        return false;
-
-                    for (int j = 0; j < Plugins.Length; j++)
-                    {
-                        ulong Id = Connection.pluginSystem.GetPluginId(Plugins[j]);
-                        if (MsgInfo.PluginId == Id)
-                        {
-                            Connection.SendPacket(new MsgGetPluginInfoResponse(Plugins[j].Name, Plugins[j].PluginVersion.ToString()), PacketId.Unknown);
-                            FoundPlugin = true;
-                            break;
-                        }
-                    }
-
-                    if (!FoundPlugin)
-                    {
-                        Connection.SendPacket(new MsgGetPluginInfoResponse("", ""), PacketId.Unknown);
-                    }
-                    return true;
-                })).Wait<bool>(false))
-                {
-                    Disconnect();
-                    if (syncObject.TimedOut)
-                        throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                    throw new Exception("Failed to retrieve the plugin information");
-                }
-
-                if (FoundPlugin)
-                {
-                    if (!(syncObject = Connection.Receive((IMessage message) =>
-                    {
-                        MsgInitPlugin msgInit = message as MsgInitPlugin;
-                        if (msgInit == null)
-                            return false;
-
-                        for (int j = 0; j < Plugins.Length; j++)
-                        {
-                            ulong Id = Connection.pluginSystem.GetPluginId(Plugins[j]);
-                            if (msgInit.PluginId == Id)
-                            {
-                                try
-                                {
-                                    Connection.pluginSystem.AddPlugin(Plugins[j]);
-                                    Plugins[j].onRegisterMessages(Connection.messageHandler);
-
-                                    try
-                                    {
-                                        if (Plugins[j].AllowPluginHooks() && Plugins[j].Hooks.Count > 0)
-                                        {
-                                            foreach (IPluginHook hook in Plugins[j].Hooks)
-                                                hook.onClientConnected();
-                                        }
-                                        Plugins[j].onClientConnected();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        onException(ex);
-                                    }
-                                }
-                                catch { return false; }
-                                break;
-                            }
-                        }
-                        return true;
-                    })).Wait<bool>(false))
-                    {
-                        Disconnect();
-                        if (syncObject.TimedOut)
-                            throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                        throw new Exception("Failed to retrieve the plugin information");
-                    }
-                }
-            }
-
-            //just to say the server we received it and we're done
-            Connection.SendPacket(new MsgOk(), PacketId.Unknown);
-
-            if (!(syncObject = Connection.Receive((IMessage message) =>
-            {
-                MsgOk msgOk = message as MsgOk;
-                if (msgOk != null)
-                    return true;
-                return false;
-            })).Wait<bool>(false))
-            {
-                Disconnect();
-                if (syncObject.TimedOut)
-                    throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
-                throw new Exception("Failed to retrieve an handshake acknowledgement");
-            }*/
-
             this.CompletedHandshake = true;
-            onValidatingComplete();
             return true;
         }
 
@@ -565,7 +452,7 @@ namespace SecureSocketProtocol2
                 throw new ArgumentException("The private key must be longer then 16 in length", "PrivateKey");
 
             //apply private key
-            Connection.protection.ApplyPrivateKey(serverProperties.ServerCertificate.PrivateKey);
+            ApplyPrivateKey(serverProperties.ServerCertificate.PrivateKey);
 
             if (serverProperties.KeyFiles != null)
             {
@@ -580,7 +467,7 @@ namespace SecureSocketProtocol2
                             break;
 
                         Array.Resize(ref data, read);
-                        Connection.protection.ApplyPrivateKey(data);
+                        ApplyPrivateKey(data);
                     }
                 }
             }
@@ -591,65 +478,6 @@ namespace SecureSocketProtocol2
                 Disconnect();
                 throw new Exception("An unexpected error occured in the HandShake");
             }
-
-            /*
-            IPlugin[] plugins = onGetPlugins();
-            Connection.SendPacket(new MsgPluginCount(plugins.Length), PacketId.Unknown);
-            foreach (IPlugin plugin in plugins)
-            {
-                //lets see if client is having correct version
-                Connection.pluginSystem.AddPlugin(plugin, getClientsDelegate);
-                plugin.onRegisterMessages(Connection.messageHandler);
-                Connection.SendPacket(new MsgGetPluginInfo(plugin.PluginId), PacketId.Unknown);
-
-                if (!Connection.Receive((IMessage message) =>
-                {
-                    MsgGetPluginInfoResponse response = message as MsgGetPluginInfoResponse;
-
-                    if (response != null)
-                    {
-                        if (plugin.Name != response.PluginName || plugin.PluginVersion.ToString() != response.VersionString)
-                            return false;
-                        return true;
-                    }
-                    return false;
-                }).Wait<bool>(false, 30000))
-                {
-                    Disconnect();
-                    return false;
-                }
-
-                try
-                {
-                    if (plugin.AllowPluginHooks() && plugin.Hooks.Count > 0)
-                    {
-                        foreach (IPluginHook hook in plugin.Hooks)
-                            hook.onClientConnected();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    onException(ex);
-                }
-                plugin.onClientConnected();
-                Connection.SendPacket(new MsgInitPlugin(plugin.PluginId), PacketId.Unknown);
-            }
-
-            if (!Connection.Receive((IMessage message) =>
-            {
-                MsgOk msgOk = message as MsgOk;
-                if (msgOk != null)
-                {
-                    //do here extra checks if required
-                    Connection.SendPacket(new MsgOk(), PacketId.Unknown); //say its ok
-                    return true;
-                }
-                return false;
-            }).Wait<bool>(false, 30000))
-            {
-                Disconnect();
-                return false;
-            }*/
 
             this.CompletedHandshake = true;
             this.Connection.KeepAliveSW = Stopwatch.StartNew();
@@ -707,14 +535,14 @@ namespace SecureSocketProtocol2
                         channel.onChannelOpen();
                     } catch(Exception ex)
                     {
-                        onException(ex);
+                        onException(ex, ErrorType.UserLand);
                     }
                     return ChannelError.Success;
                 }
             }
             catch(Exception ex)
             {
-                onException(ex);
+                onException(ex, ErrorType.Core);
             }
             return ChannelError.InitializeError;
         }
@@ -800,7 +628,7 @@ namespace SecureSocketProtocol2
                 }
                 catch (Exception ex)
                 {
-                    onException(ex);
+                    onException(ex, ErrorType.Core);
                 }
 
                 if (PeerSide == SecureSocketProtocol2.PeerSide.Client)
@@ -833,7 +661,7 @@ namespace SecureSocketProtocol2
             }
             catch (Exception ex)
             {
-                onException(ex);
+                onException(ex, ErrorType.UserLand);
             }
 
             try
@@ -849,7 +677,7 @@ namespace SecureSocketProtocol2
             }
             catch (Exception ex)
             {
-                onException(ex);
+                onException(ex, ErrorType.Core);
             }
 
             try
@@ -865,7 +693,7 @@ namespace SecureSocketProtocol2
             }
             catch (Exception ex)
             {
-                onException(ex);
+                onException(ex, ErrorType.Core);
             }
 
             this.State = ConnectionState.Closed;
@@ -879,7 +707,7 @@ namespace SecureSocketProtocol2
                 }
                 catch (Exception ex)
                 {
-                    onException(ex);
+                    onException(ex, ErrorType.UserLand);
                 }
             }
         }

@@ -96,7 +96,7 @@ namespace SecureSocketProtocol2.Network
                     }
                     catch(Exception ex)
                     {
-                        connection.Client.onException(ex);
+                        connection.Client.onException(ex, ErrorType.Core);
                     }
                 }
             }

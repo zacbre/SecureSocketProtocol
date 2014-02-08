@@ -86,6 +86,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             }).Wait<bool>(false, 10000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, SHS_TimeSynchronisation"), ErrorType.Core);
                 return false;
             }
 

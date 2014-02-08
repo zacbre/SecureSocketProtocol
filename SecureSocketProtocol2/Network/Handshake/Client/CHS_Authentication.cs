@@ -58,6 +58,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 })).Wait<bool>(false, 30000))
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, CHS_Authentication"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new TimeoutException(TimeOutMessage);
                     throw new Exception("Username or Password is incorrect");
@@ -73,6 +74,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 })).Wait<bool>(false, 30000))
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, CHS_Authentication"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new TimeoutException(TimeOutMessage);
                     throw new Exception(OutOfSyncMessage);
@@ -86,7 +88,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             }
             catch (Exception ex)
             {
-                Client.onException(ex);
+                Client.onException(ex, ErrorType.Core);
             }
 
             return true;

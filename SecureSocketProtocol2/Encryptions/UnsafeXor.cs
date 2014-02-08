@@ -52,6 +52,25 @@ namespace SecureSocketProtocol2.Encryptions
             this.DynamicKey = UseDynamicKey;
         }
 
+        public unsafe UnsafeXor(uint[] _key, bool UseDynamicKey)
+        {
+            decrypt_key = new uint[Key.Length];
+            encrypt_key = new uint[Key.Length];
+
+            for (int i = 0; i < encrypt_key.Length; i++)
+            {
+                encrypt_key[i] = Key[i];
+                decrypt_key[i] = Key[i];
+            }
+            for (int i = 0; i < _key.Length; i++)
+            {
+                encrypt_key[i % encrypt_key.Length] += (uint)((_key[i] * i) + _key.Length);
+                decrypt_key[i % decrypt_key.Length] += (uint)((_key[i] * i) + _key.Length);
+            }
+
+            this.DynamicKey = UseDynamicKey;
+        }
+
         public byte[] Encrypt(ref byte[] data, int offset, int length)
         {
             lock (ProcessLock)

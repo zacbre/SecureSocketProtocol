@@ -23,6 +23,7 @@ namespace Benchmarker
 
         static List<Client> Clients = new List<Client>();
         const int ThreadCount = 8;
+        static bool Paused = false;
 
         static void Main(string[] args)
         {
@@ -37,6 +38,18 @@ namespace Benchmarker
                 threads.Add(thread);
             }
 
+            new Thread(new ThreadStart(() =>
+            {
+                while (true)
+                {
+                    Thread.Sleep(100);
+                    if (Console.ReadKey(true).Key == ConsoleKey.P)
+                    {
+                        Paused = !Paused;
+                    }
+                }
+            })).Start();
+
             int PrevCount = Clients.Count;
             while (true)
             {
@@ -50,6 +63,8 @@ namespace Benchmarker
                     ConnectionInfo inf = info[i];
                     Console.WriteLine("[Thread" + i + "] Connections created: " + inf.CreatedConnections + ", Trying to connect time: " + inf.ConnectionSW.Elapsed);
                 }
+                if (Paused)
+                    Console.WriteLine("PAUSED");
                 Thread.Sleep(1000);
             }
         }
@@ -62,6 +77,9 @@ namespace Benchmarker
                 Client client = new Client();
                 info.CreatedConnections++;
                 info.ConnectionSW = Stopwatch.StartNew();
+
+                while (Paused)
+                    Thread.Sleep(1000);
 
                 lock (Clients)
                 {
@@ -119,7 +137,7 @@ namespace Benchmarker
 
         }
 
-        public override void onException(Exception ex)
+        public override void onException(Exception ex, ErrorType errorType)
         {
 
         }

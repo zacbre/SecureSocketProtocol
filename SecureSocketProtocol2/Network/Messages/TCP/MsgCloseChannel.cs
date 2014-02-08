@@ -36,7 +36,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
                     }
                     catch (Exception ex)
                     {
-                        client.Connection.Client.onException(ex);
+                        client.Connection.Client.onException(ex, ErrorType.UserLand);
                     }
                     client.Connection.Client.channels.Remove(ConnectionId);
                 }

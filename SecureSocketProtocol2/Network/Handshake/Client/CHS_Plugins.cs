@@ -136,7 +136,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                                 }
                                 catch (Exception ex)
                                 {
-                                    Client.onException(ex);
+                                    Client.onException(ex, ErrorType.UserLand);
                                 }
                             }
                             catch { return false; }
@@ -147,6 +147,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 })).Wait<bool>(false))
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, CHS_Plugins"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
                     throw new Exception("Failed to retrieve the plugin information");

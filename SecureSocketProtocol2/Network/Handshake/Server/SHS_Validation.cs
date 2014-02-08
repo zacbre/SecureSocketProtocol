@@ -66,6 +66,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             }).Wait<bool>(false, 30000))
             {
                 Client.Disconnect();
+                Client.onException(new Exception("Handshake went wrong, SHS_Validation"), ErrorType.Core);
                 return false;
             }
 

@@ -1,16 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace SecureSocketProtocol2.Network.Messages.TCP
 {
     internal class MsgRsaPublicKey : IMessage
     {
-        public string PublicKey;
-        public MsgRsaPublicKey(string PublicKey)
+        public byte[] Modulus;
+        public byte[] Exponent;
+        public MsgRsaPublicKey(RSAParameters Parameters)
             : base()
         {
-            this.PublicKey = PublicKey;
+            this.Modulus = Parameters.Modulus;
+            this.Exponent = Parameters.Exponent;
         }
         public MsgRsaPublicKey()
             : base()

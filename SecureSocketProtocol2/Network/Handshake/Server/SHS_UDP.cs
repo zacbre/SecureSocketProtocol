@@ -49,6 +49,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 if (!Client.UdpSyncObject.Wait<bool>(false, 30000))
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, SHS_UDP"), ErrorType.Core);
                     return false;
                 }
             }

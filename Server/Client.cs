@@ -83,7 +83,7 @@ namespace Server
             Console.WriteLine("Received keep-alive");
         }
 
-        public override void onException(Exception ex)
+        public override void onException(Exception ex, ErrorType errorType)
         {
 
         }

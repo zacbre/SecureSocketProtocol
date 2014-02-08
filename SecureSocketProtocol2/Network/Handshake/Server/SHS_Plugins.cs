@@ -79,6 +79,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 }).Wait<bool>(false, 30000))
                 {
                     Client.Disconnect();
+                    Client.onException(new Exception("Handshake went wrong, SHS_Plugins"), ErrorType.Core);
                     return false;
                 }
 
@@ -92,7 +93,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 }
                 catch (Exception ex)
                 {
-                    Client.onException(ex);
+                    Client.onException(ex, ErrorType.UserLand);
                 }
                 plugin.onClientConnected();
                 base.SendMessage(new MsgInitPlugin(plugin.PluginId));

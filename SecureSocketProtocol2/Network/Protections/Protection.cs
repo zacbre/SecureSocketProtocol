@@ -56,7 +56,7 @@ namespace SecureSocketProtocol2.Network.Protections
             this.Protections = new SortedList<ProtectionType, List<IProtection>>();
 
             //AddProtection(new AesProtection(connection));
-            //AddProtection(new TcpWopProtection());
+            AddProtection(new TcpWopProtection());
             //AddProtection(new UdpWopProtection());
             //AddProtection(new QuickLzProtection());
             //AddProtection(new UnsafeXorProtection());

@@ -51,13 +51,13 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
                         {
                             connection.Client.onNewChannelOpen(channel);
                         }
-                        catch (Exception ex) { connection.Client.onException(ex); }
+                        catch (Exception ex) { connection.Client.onException(ex, ErrorType.Core); }
 
                         try
                         {
                             channel.onChannelOpen();
                         }
-                        catch (Exception ex) { connection.Client.onException(ex); }
+                        catch (Exception ex) { connection.Client.onException(ex, ErrorType.Core); }
                     }
                 }
             }

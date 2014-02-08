@@ -140,7 +140,7 @@ namespace SecureSocketProtocol2.Network
                 }
                 catch (Exception ex)
                 {
-                    Client.onException(ex);
+                    Client.onException(ex, ErrorType.Core);
                 }
                 return;
             }
@@ -185,7 +185,7 @@ namespace SecureSocketProtocol2.Network
                         else*/
                         {
                             Client.Disconnect();
-                            Client.onException(ex);
+                            Client.onException(ex, ErrorType.Core);
                         }
                     }
                     break;
@@ -294,7 +294,7 @@ namespace SecureSocketProtocol2.Network
                                 }
                                 catch (Exception ex)
                                 {
-                                    Client.onException(ex);
+                                    Client.onException(ex, ErrorType.Core);
                                     return;
                                 }
 
@@ -403,7 +403,7 @@ namespace SecureSocketProtocol2.Network
                     }
                     catch (Exception ex)
                     {
-                        Client.onException(ex);
+                        Client.onException(ex, ErrorType.UserLand);
                     }
                 }
             }
@@ -522,7 +522,7 @@ namespace SecureSocketProtocol2.Network
             }
             catch (Exception ex)
             {
-                Client.onException(ex);
+                Client.onException(ex, ErrorType.UserLand);
             }
         }
 

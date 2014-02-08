@@ -68,7 +68,7 @@ namespace SecureSocketProtocol2.Misc
                     }
                     catch (Exception ex)
                     {
-                        Client.onException(ex);
+                        Client.onException(ex, ErrorType.Core);
                     }
                 }
             }

@@ -13,7 +13,7 @@ namespace SecureSocketProtocol2.Misc
         void onClientConnect();
         void onDisconnect();
         void onDeepPacketInspection(IMessage message);
-        void onException(Exception ex);
+        void onException(Exception ex, ErrorType errorType);
         void onRegisterMessages(MessageHandler messageHandler);
         void Disconnect();
         SSPError SendMessage(IMessage message, bool compress = true, bool cache = true);

@@ -17,6 +17,14 @@ namespace SecureSocketProtocol2.Encryptions
         public bool PkcsPadding { get; private set; }
         public int KeySize { get; private set; }
 
+        public RSAParameters Parameters
+        {
+            get
+            {
+                return rsa.ExportParameters(false);
+            }
+        }
+
         public RSAEncryption(int KeySize, bool PkcsPadding = true)
         {
             this.rsa = new System.Security.Cryptography.RSACryptoServiceProvider(KeySize);
@@ -34,6 +42,15 @@ namespace SecureSocketProtocol2.Encryptions
             this.KeySize = KeySize;
             this.DecChunkSize = (KeySize / 8);
             this.EncChunkSize = DecChunkSize / 2;
+        }
+        public RSAEncryption(int KeySize, byte[] Modulus, byte[] Exponent, bool PkcsPadding = true)
+        {
+            RSAParameters parameters = new RSAParameters();
+            parameters.Exponent = Exponent;
+            parameters.Modulus = Modulus;
+            this.rsa = new RSACryptoServiceProvider(KeySize);
+            this.rsa.ImportParameters(parameters);
+            this.PkcsPadding = PkcsPadding;
         }
 
         public void GeneratePrivateKey()
@@ -54,7 +71,10 @@ namespace SecureSocketProtocol2.Encryptions
                 using (MemoryStream stream = new MemoryStream(Data.Length + ExpectedSize))
                 {
                     int LengthLeft = Length;
-                    rsa.FromXmlString(PublicKey);
+                    if (PublicKey != null && PublicKey.Length > 0)
+                    {
+                        rsa.FromXmlString(PublicKey);
+                    }
 
                     for (int i = Offset; i < Length; i += EncChunkSize)
                     {
@@ -78,10 +98,14 @@ namespace SecureSocketProtocol2.Encryptions
             if (Length % DecChunkSize != 0)
                 throw new Exception("Invalid length");
 
-            using (MemoryStream stream = new MemoryStream(Data.Length + 1000000))
+            using (MemoryStream stream = new MemoryStream(Data.Length))
             {
                 int LengthLeft = Length;
-                rsa.FromXmlString(PrivateKey);
+
+                if (PrivateKey != null && PrivateKey.Length > 0)
+                {
+                    rsa.FromXmlString(PrivateKey);
+                }
 
                 for (int i = Offset; i < Length; i += DecChunkSize)
                 {

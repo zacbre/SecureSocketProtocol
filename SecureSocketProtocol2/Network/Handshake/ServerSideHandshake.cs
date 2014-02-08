@@ -29,8 +29,10 @@ namespace SecureSocketProtocol2.Network.Handshake
         {
             foreach (Handshake handShake in HandShakes)
             {
+                Console.WriteLine(handShake.GetType().Name);
                 if (!handShake.DoHandshake())
                 {
+                    Console.WriteLine(handShake.GetType().Name + ", FAILED");
                     Client.Disconnect();
                     return false;
                 }
