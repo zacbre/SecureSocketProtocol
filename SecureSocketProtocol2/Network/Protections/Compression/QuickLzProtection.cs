@@ -1,4 +1,5 @@
 ﻿using SecureSocketProtocol2.Compressions;
+using SecureSocketProtocol2.Interfaces;
 using SecureSocketProtocol2.Misc;
 using System;
 using System.Collections.Generic;

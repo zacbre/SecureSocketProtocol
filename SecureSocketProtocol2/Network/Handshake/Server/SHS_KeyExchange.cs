@@ -3,6 +3,7 @@ using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using SecureSocketProtocol2.Network.Protections.Encryption;
 using System;
 using System.Collections.Generic;
@@ -71,7 +72,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
 
             diffieHellman = KeyHandler.GetDiffieHellman();
             byte[] diffieStr = diffieHellman.GetDiffie();
-            long index = Client.PrivateKeyOffset % cryptedKey.Length;
+            long index = Client.PrivateKeyOffset % 65535;
             if (index <= 4)
                 index = 10;
 
@@ -143,7 +144,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 return false;
             }).Wait<bool>(false, 30000))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 Client.onException(new Exception("Handshake went wrong, SHS_KeyExchange"), ErrorType.Core);
                 return false;
             }

@@ -1,5 +1,9 @@
 ﻿using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Channels;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
+using SecureSocketProtocol2.Network.Messages.TCP.LiteCode;
+using SecureSocketProtocol2.Network.Messages.TCP.StreamMessages;
 using SecureSocketProtocol2.Network.Messages.UDP;
 using System;
 using System.Collections.Generic;
@@ -50,8 +54,8 @@ namespace SecureSocketProtocol2.Network.Messages
                 AddMessage(typeof(MsgServerEncryption), "HANDSHAKE_SERVER_ENCRYPTION");
                 AddMessage(typeof(MsgUdpValidation), "HANDSHAKE_UDP_VALIDATION");
                 AddMessage(typeof(MsgRsaPublicKey), "HANDSHAKE_RSA_PUBLICKEY");
-                AddMessage(typeof(MsgAuthenication), "HANDSHAKE_AUTHENICATION");
-                AddMessage(typeof(MsgAuthenicationSuccess), "HANDSHAKE_AUTHENICATION_RESPONSE");
+                AddMessage(typeof(MsgAuthentication), "HANDSHAKE_AUTHENICATION");
+                AddMessage(typeof(MsgAuthenticationSuccess), "HANDSHAKE_AUTHENICATION_RESPONSE");
                 AddMessage(typeof(MsgUdpHandshake), "UDP_HANDSHAKE"); //use incase if UDP is going to be used
                 AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
                 AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
@@ -157,6 +161,15 @@ namespace SecureSocketProtocol2.Network.Messages
             AddMessage(typeof(MsgInitPlugin), "HANDSHAKE_GET_INIT_PLUGIN");
             AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
             AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
+            AddMessage(typeof(MsgOpenStream), "STREAM_OPEN");
+            AddMessage(typeof(MsgOpenStreamResponse), "STREAM_OPEN_RESPONSE");
+            AddMessage(typeof(MsgStreamData), "STREAM_DATA");
+            AddMessage(typeof(MsgCloseStream), "STREAM_CLOSE");
+            AddMessage(typeof(MsgPacketQueue), "PACKET_QUEUE_DATA");
+            AddMessage(typeof(MsgGetSharedClass), "GET_SHARED_CLASS");
+            AddMessage(typeof(MsgGetSharedClassResponse), "GET_SHARED_CLASS_RESPONSE");
+            AddMessage(typeof(MsgExecuteMethod), "EXECUTE_METHOD");
+            AddMessage(typeof(MsgExecuteMethodResponse), "EXECUTE_METHOD_RESPONSE");
         }
     }
 }

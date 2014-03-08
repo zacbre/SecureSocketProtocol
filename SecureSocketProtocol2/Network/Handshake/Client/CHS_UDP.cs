@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using SecureSocketProtocol2.Network.Messages.UDP;
 using System;
 using System.Collections.Generic;
@@ -62,7 +63,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
 
                 if (!UdpSuccess)
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     Client.onException(new Exception("Handshake went wrong, CHS_UDP"), ErrorType.Core);
                     throw new Exception("The server did not respond in time to acknowledge the UDP connection");
                 }

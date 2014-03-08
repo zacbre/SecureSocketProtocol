@@ -53,10 +53,8 @@ namespace Server
         public override ushort ListenPort { get { return 539; } }
         public override string ListenIp { get { return "0.0.0.0"; } }
         public override object[] BaseClientArguments { get { return new object[0]; } }
-        public override bool AllowUdp { get { return false; } }
+        public override bool AllowUdp { get { return true; } }
         public override bool UserPassAuthenication { get { return true; } }
-
-
 
         public override CertificateInfo ServerCertificate
         {
@@ -72,6 +70,11 @@ namespace Server
                     //new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
                 };
             }
+        }
+
+        public override bool GenerateKeysInBackground
+        {
+            get { return false; }
         }
     }
 
@@ -101,7 +104,7 @@ namespace Server
 
         public override DateTime ValidTo
         {
-            get { return this.CreatedAt.AddMinutes(1); }
+            get { return this.CreatedAt.AddMinutes(15); }
         }
 
         public override DateTime ValidFrom

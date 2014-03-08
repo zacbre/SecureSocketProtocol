@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -85,7 +86,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 return false;
             }).Wait<bool>(false, 10000))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 Client.onException(new Exception("Handshake went wrong, SHS_TimeSynchronisation"), ErrorType.Core);
                 return false;
             }

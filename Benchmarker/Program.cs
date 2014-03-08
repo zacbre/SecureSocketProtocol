@@ -199,6 +199,11 @@ namespace Benchmarker
         {
 
         }
+
+        public override void onNewStreamOpen(SecureStream stream)
+        {
+
+        }
     }
 
     public class ClientChannel : Channel

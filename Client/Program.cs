@@ -18,7 +18,10 @@ using SecureSocketProtocol2.Plugin;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Network.Protections.Encryption;
 using SecureSocketProtocol2.Network.Protections.Masks;
-using TestPlugin;
+using System.Windows.Forms;
+using Client.LiteCode;
+using SecureSocketProtocol2.Attributes;
+using SecureSocketProtocol2.Network.Protections.Compression;
 
 namespace Client
 {
@@ -92,7 +95,7 @@ namespace Client
             if (stream.Length == 0)
             {
                 Stopwatch sw2 = Stopwatch.StartNew();
-                PayloadMasker.CreateMaskTable(37483782, 3, stream);
+                PayloadMasker.CreateMaskTable(37483782, 4, stream);
                 sw2.Stop();
                 Console.WriteLine("Generate completed in: " + sw2.Elapsed.Hours.ToString("D2") + ":" +  sw2.Elapsed.Minutes.ToString("D2") + ":" +  sw2.Elapsed.Seconds.ToString("D2"));
             }
@@ -145,7 +148,7 @@ namespace Client
                     sw = Stopwatch.StartNew();
                 }
             }*/
-
+            
             //try
             {
                 //EncryptionTest();
@@ -157,35 +160,43 @@ namespace Client
             Process.GetCurrentProcess().WaitForExit();
         }
 
-        public override void onReceiveMessage(IMessage message)
+        private string DelegateCallbackTest(string Test)
         {
-            TestMessage tm = message as TestMessage;
-            if (tm != null)
-            {
-                PacketsPerSec++;
-                Received += (ulong)message.RawSize;
-
-                if (speedSW.ElapsedMilliseconds >= 1000)
-                {
-                    Console.WriteLine("[TCP] last size:" + message.RawSize +
-                                     ", Packet /sec:" + PacketsPerSec +
-                                     ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]" +
-                                     ", bit:" + Math.Round(((float)((float)Received * 8F) / 1024F) / 1024F, 2));
-                    PacketsPerSec = 0;
-                    Received = 0;
-                    speedSW = Stopwatch.StartNew();
-                }
-            }
+            return "A message from the private method!";
         }
-
-        
 
         public override void onClientConnect()
         {
             Console.Title = "SSP2 Client - ClientId:" + base.ClientId;
             Console.WriteLine("Connected");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
+            ISharedTest SharedTest = base.GetSharedClass<ISharedTest>("SharedTest");
 
+            Benchmark BenchLiteCode = new Benchmark();
+            int speedy = 0;
+            while (false)
+            {
+                BenchLiteCode.Bench(new BenchCallback(() =>
+                {
+                    //send server our private method, now the server can call our private method ;)
+                    //SharedTest.DelegateTest(new Callback<string>(DelegateCallbackTest));
+                    SharedTest.SendByteArray(new byte[65535]);
+                }));
+
+                if(BenchLiteCode.PastASecond)
+                {
+                    Console.WriteLine("Call Speed: " + BenchLiteCode.SpeedPerSec + ", Speed: " + Math.Round(((float)speedy / 1000F) / 1000F, 2) + "MBps ");
+                    speedy = 0;
+                }
+            }
+
+            //load a image by opening a stream to the server
+            SecureStream ImgStream = new SecureStream(this);
+            int count = 0;
+            Benchmark BenchFiles = new Benchmark();
+
+            Image img = (Image)Bitmap.FromStream(ImgStream);
+            img.Save(@"C:\Users\DragonHunter\Desktop\DownloadedSSP_Image.png");
 
             while (false)
             {
@@ -193,16 +204,14 @@ namespace Client
                 Thread.Sleep(1000);
             }
 
-            byte[] buffer = new byte[60000];
-            Stopwatch sw = Stopwatch.StartNew();
             int packets = 0;
             ulong DataPerSec = 0;
+            Stopwatch sw = Stopwatch.StartNew();
             Random rnd = new Random();
-
             TestMessage message = new TestMessage();
             int ChannelsClosed = 0;
 
-            while(false)
+            /*while(false)
             {
                 TestChannel channel = new TestChannel();
                 
@@ -221,21 +230,14 @@ namespace Client
                         sw = Stopwatch.StartNew();
                     }
                 }
-            }
+            }*/
 
             RandomDecimal rndDec = new RandomDecimal(DateTime.Now.Millisecond);
 
-            while (true)
+            while (base.Connected)
             {
-                //msg.Stuff = new byte[rnd.Next(1, 65535)];
-                //rnd.NextBytes(buffer);
                 packets++;
-                DataPerSec += (ulong)message.Stuff.Length;
-                /*msg.Graf++;
-                msg.PauperGraf++;*/
-                //rnd.NextBytes(msg.Stuff);
-                //base.SendUdpMessage(message);
-                base.SendMessage(message);
+
 
                 if (sw.ElapsedMilliseconds >= 1000)
                 {
@@ -248,14 +250,13 @@ namespace Client
             Process.GetCurrentProcess().WaitForExit();
         }
 
-        public override void onDisconnect()
+        public override void onDisconnect(DisconnectReason Reason)
         {
-            Console.WriteLine("Disconnected");
-        }
-
-        public override void onDeepPacketInspection(IMessage message)
-        {
-            
+            Console.WriteLine("Disconnected from the server!");
+            if (base.Certificate.ValidTo > base.TimeSync.Subtract(TimeSpan.FromSeconds(10))) //synchronized time might not be exactly correct
+            {
+                Console.WriteLine("The certificate time ended!");
+            }
         }
 
         public override void onValidatingComplete()
@@ -270,7 +271,7 @@ namespace Client
 
         public override void onException(Exception ex, ErrorType errorType)
         {
-
+            Console.WriteLine(ex);
         }
 
         public override void onReconnect()
@@ -279,16 +280,6 @@ namespace Client
         }
 
         public override void onNewChannelOpen(Channel channel)
-        {
-
-        }
-
-        public override void onReceiveUdpMessage(IMessage message)
-        {
-
-        }
-
-        public override void onRegisterMessages(MessageHandler messageHandler)
         {
 
         }
@@ -323,13 +314,13 @@ namespace Client
         {
             return new IPlugin[]
             {
-                new TestPlug()
+
             };
         }
 
         public override void onAddProtection(Protection protection)
         {
-
+            protection.AddProtection(new QuickLzProtection());
         }
 
         public override uint HeaderTrashCount
@@ -339,7 +330,7 @@ namespace Client
 
         public override uint PrivateKeyOffset
         {
-            get { return 45532; }
+            get { return 45634232; }
         }
 
         public override bool onAuthentication(string Username, string Password)
@@ -348,6 +339,16 @@ namespace Client
         }
 
         public override void onAuthenticated()
+        {
+
+        }
+
+        public override void onNewStreamOpen(SecureStream stream)
+        {
+
+        }
+
+        public override void onShareClasses()
         {
 
         }

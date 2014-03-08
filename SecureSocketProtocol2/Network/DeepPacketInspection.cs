@@ -52,8 +52,8 @@ namespace SecureSocketProtocol2.Network
                     if (Header != null)
                     {
                         //checking the packet size
-                        if (Header.PacketSize < 0 || Header.PacketSize >= ((1000 * 1000) * 10) /*10MB*/)
-                            return false;
+                        //if (Header.PacketSize < 0 || Header.PacketSize >= Connection.MAX_PAYLOAD)
+                        //    return false;
 
                         //checking if a attacker tried to send a packet
                         if (Header.CurPacketId != PacketId)
@@ -71,7 +71,8 @@ namespace SecureSocketProtocol2.Network
                                 return false;
                         }
                     }
-                } catch
+                }
+                catch
                 {
                     //if anything goes wrong this packet it must be suspicious
                     return false;

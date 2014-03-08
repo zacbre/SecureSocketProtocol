@@ -20,7 +20,6 @@ namespace Server
 
         }
 
-
         public override void onChannelOpen()
         {
             //Console.WriteLine("Test channel has being open'd");
@@ -43,6 +42,11 @@ namespace Server
                 PacketsPerSec = 0;
                 speedSW = Stopwatch.StartNew();
             }
+        }
+
+        public override void onDeepPacketInspection(IMessage message)
+        {
+
         }
     }
 }

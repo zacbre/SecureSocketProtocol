@@ -26,10 +26,19 @@ namespace SecureSocketProtocol2.Network.Messages
             {
                 uint Id = MessageHandler.GetMessageId(message.GetType());
                 IMessage CachedMessage = null;
+                npw.WriteBool(false);
 
                 if (!Messages.TryGetValue(Id, out CachedMessage))
                 {
                     Messages.Add(Id, (IMessage)Activator.CreateInstance(message.GetType()));
+
+                    FieldInfo[] tmpFields = message.GetType().GetFields();
+                    for (int i = 0; i < tmpFields.Length; i++)
+                    {
+                        object obj = tmpFields[i].GetValue(message);
+                        Type type = (obj == null ? null : obj.GetType());
+                        npw.WriteObject(obj);
+                    }
                     return false;
                 }
 
@@ -343,16 +352,25 @@ namespace SecureSocketProtocol2.Network.Messages
                 uint Id = msgHandler.GetMessageId(message.GetType());
                 isCached = pr.ReadBool();
 
-                if (!Messages.TryGetValue(Id, out CachedMessage))
+                if (!Messages.TryGetValue(Id, out CachedMessage) && !isCached)
                 {
                     CachedMessage = (IMessage)Activator.CreateInstance(message.GetType());
                     Messages.Add(Id, (IMessage)Activator.CreateInstance(message.GetType()));
+
+                    FieldInfo[] _fields = message.GetType().GetFields();
+                    FieldInfo[] _cachedFields = CachedMessage.GetType().GetFields();
+
+                    for (int i = 0; i < _fields.Length; i++)
+                    {
+                        //de-serialize objects
+                        int oldPos = pr.Offset;
+                        _fields[i].SetValue(message, pr.ReadObject());
+                        pr.Offset = oldPos;
+                        _fields[i].SetValue(Messages[Id], pr.ReadObject());
+                    }
                     return message;
                 }
 
-                if (!isCached)
-                    return message;
-                
                 FieldInfo[] fields = message.GetType().GetFields();
                 FieldInfo[] cacheFields = CachedMessage.GetType().GetFields();
 

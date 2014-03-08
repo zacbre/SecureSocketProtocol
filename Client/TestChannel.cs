@@ -42,5 +42,10 @@ namespace Client
                 speedSW = Stopwatch.StartNew();
             }
         }
+
+        public override void onDeepPacketInspection(IMessage message)
+        {
+
+        }
     }
 }

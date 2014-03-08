@@ -1,4 +1,5 @@
 ﻿using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;

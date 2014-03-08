@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -53,7 +54,7 @@ namespace SecureSocketProtocol2.Network.Handshake
             else if (Client.PeerSide == PeerSide.Server && !CanServerSendMessage)
                 throw new Exception("The server cannot send a message at this time, check the agreed handshake");
 
-            Client.Connection.SendPacket(message, PacketId.Unknown);
+            Client.Connection.SendPayload(message, PacketId.Unknown);
 
             if (Client.PeerSide == PeerSide.Client)
                 ClientTypeIndex++;
@@ -77,7 +78,7 @@ namespace SecureSocketProtocol2.Network.Handshake
                 return false;
             }).Wait<bool>(false, TimeOut))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 throw new Exception(TimeOutMessage);
             }
 
@@ -105,7 +106,7 @@ namespace SecureSocketProtocol2.Network.Handshake
 
         public bool ValidatePhase_Server()
         {
-            Client.Connection.SendPacket(new MsgOk(), PacketId.Unknown);
+            Client.Connection.SendPayload(new MsgOk(), PacketId.Unknown);
 
             if (!Client.Connection.Receive((IMessage message) =>
             {
@@ -119,7 +120,7 @@ namespace SecureSocketProtocol2.Network.Handshake
             }
 
             //tell the client it's ok again so we can move on
-            Client.Connection.SendPacket(new MsgOk(), PacketId.Unknown);
+            Client.Connection.SendPayload(new MsgOk(), PacketId.Unknown);
             return true;
         }
 
@@ -136,7 +137,7 @@ namespace SecureSocketProtocol2.Network.Handshake
                 return false;
             }
 
-            Client.Connection.SendPacket(new MsgOk(), PacketId.Unknown);
+            Client.Connection.SendPayload(new MsgOk(), PacketId.Unknown);
 
             if (!Client.Connection.Receive((IMessage message) =>
             {

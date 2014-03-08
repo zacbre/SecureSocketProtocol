@@ -52,7 +52,7 @@ namespace SecureSocketProtocol2.Plugin
         /// </summary>
         /// <param name="message">The message you want to send</param>
         /// <returns>If successful sending the message</returns>
-        protected SSPError SendMessage(IMessage message, PluginHeaderCallback HeaderCallback = null)
+        protected SSPError SendMessage(IMessage message)
         {
             if (AllowPluginHooks() && Hooks.Count > 0)
             {
@@ -61,7 +61,7 @@ namespace SecureSocketProtocol2.Plugin
                 return SSPError.ErrorSuccess;
             }
 
-            Client.Connection.SendPayload(message, PacketId.PluginPacket, this, true, true, HeaderCallback);
+            Client.Connection.SendPayload(message, PacketId.PluginPacket, this);
             return SSPError.ErrorSuccess;
         }
 

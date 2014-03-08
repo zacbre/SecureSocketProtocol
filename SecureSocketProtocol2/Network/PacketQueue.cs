@@ -1,4 +1,7 @@
 ﻿using SecureSocketProtocol2.Misc;
+using SecureSocketProtocol2.Network.Messages;
+using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,21 +13,20 @@ namespace SecureSocketProtocol2.Network
 {
     internal class PacketQueue
     {
-        public int MaxPacketQueueSize { get; set; }
-        public int TimeOut { get; set; }
+        public const int MaxMemoryUsageMultiplier = 5; //only affects the sender
+        public int MaxPacketQueueSize { get { return Connection.MAX_PAYLOAD * MaxMemoryUsageMultiplier; } }
+        public int TimeOut { get { return 250; } }
         private Queue<PacketQueueInfo> packetQueue = new Queue<PacketQueueInfo>();
         private bool threadRunning = false;
         private long sizeCounter = 0;
         private Connection conn;
         private AutoResetEvent arSizeUpdate = new AutoResetEvent(false);
-        private int MaxProcessingTime;
+        private int MaxProcessingTime = 500;
+        private object AddQueueLock = new object();
 
         public PacketQueue(Connection c)
         {
-            MaxPacketQueueSize = 65535;
-            TimeOut = 250;
-            MaxProcessingTime = 500;
-            conn = c;
+            this.conn = c;
         }
 
         public void CleanQueue()
@@ -36,9 +38,9 @@ namespace SecureSocketProtocol2.Network
             }
         }
 
-        public unsafe void QueuePacket(byte[] packet, PacketId packetId)
+        public unsafe void QueuePacket(IMessage message, PacketId packetId, IPlugin plugin, Channel channel)
         {
-            lock (packetQueue)
+            lock (AddQueueLock)
             {
                 if (sizeCounter > MaxPacketQueueSize)
                 {
@@ -46,8 +48,15 @@ namespace SecureSocketProtocol2.Network
                         SendQueue();
                 }
 
-                packetQueue.Enqueue(new PacketQueueInfo(packet, packetId));
-                sizeCounter += packet.Length;
+                NetworkPayloadWriter temp = message.WritePacket(message, conn);
+                message.RawSize = temp.Length - conn.HEADER_SIZE;
+                byte[] packet = temp.GetPayload();
+
+                lock (packetQueue)
+                {
+                    packetQueue.Enqueue(new PacketQueueInfo(packet, packetId, plugin, channel, conn.messageHandler.GetMessageId(message.GetType())));
+                    sizeCounter += packet.Length;
+                }
 
                 if (!threadRunning)
                 {
@@ -98,7 +107,7 @@ namespace SecureSocketProtocol2.Network
 
                         compareBuffer = packetQueue.Peek();
 
-                        if (compareBuffer.Payload.Length == currentData.Payload.Length || compareBuffer.packetId != currentData.packetId)
+                        if (compareBuffer.Payload.Length == currentData.Payload.Length || compareBuffer.MessageId != currentData.MessageId)
                         {
                             fixed (byte* ptr1 = currentData.Payload, ptr2 = compareBuffer.Payload)
                             {
@@ -108,21 +117,27 @@ namespace SecureSocketProtocol2.Network
                                     sizeCounter -= compareBuffer.Payload.Length;
                                     packetQueue.Dequeue();
                                 }
-                                else break;
+                                else
+                                {
+                                    break;
+                                }
                             }
                         }
-                        else break;
+                        else
+                        {
+                            break;
+                        }
                     }
 
                     pw.WriteBytes(currentData.ToByteArray());
                     currentData = null;
                     compareBuffer = null;
 
-                    if (pw.Length > MaxPacketQueueSize)
+                    if (pw.Length > 65535)
                         break;
                 }
 
-                //conn.SendPayload(pw.ToByteArray(), 0, pw.Length, PacketId.PacketQueue, true);
+                conn.SendPayload(new MsgPacketQueue(pw.ToByteArray()), PacketId.PacketQueue);
                 pw = null;
                 sw.Stop();
             }
@@ -133,11 +148,17 @@ namespace SecureSocketProtocol2.Network
             public byte[] Payload;
             public PacketId packetId;
             public byte Duplicates = 1;
+            public IPlugin plugin;
+            public Channel channel;
+            public uint MessageId;
 
-            public PacketQueueInfo(byte[] Payload, PacketId packetId)
+            public PacketQueueInfo(byte[] Payload, PacketId packetId, IPlugin plugin, Channel channel, uint MessageId)
             {
                 this.Payload = Payload;
                 this.packetId = packetId;
+                this.plugin = plugin;
+                this.channel = channel;
+                this.MessageId = MessageId;
             }
 
             public byte[] ToByteArray()
@@ -145,6 +166,16 @@ namespace SecureSocketProtocol2.Network
                 PayloadWriter pw = new PayloadWriter();
                 pw.WriteByte((byte)packetId);
                 pw.WriteByte(Duplicates);
+                pw.WriteBool(plugin != null);
+                if (plugin != null)
+                    pw.WriteULong(plugin.PluginId);
+
+                pw.WriteBool(channel != null);
+                if (channel != null)
+                    pw.WriteUInteger(channel.ConnectionId);
+
+                pw.WriteUInteger(MessageId);
+
                 pw.WriteThreeByteInteger(Payload.Length);
                 pw.WriteBytes(Payload);
                 return pw.ToByteArray();

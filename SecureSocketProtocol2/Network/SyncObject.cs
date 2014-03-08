@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Interfaces;
+using SecureSocketProtocol2.Misc;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -19,17 +21,35 @@ namespace SecureSocketProtocol2.Network
 
         public SyncObject(Connection connection)
         {
+            if (connection == null)
+                throw new ArgumentNullException("connection");
             this.connection = connection;
+        }
+        public SyncObject(IClient connection)
+        {
+            if (connection == null)
+                throw new ArgumentNullException("connection");
+            if (connection.Connection == null)
+                throw new ArgumentException("connection.Connection is null");
+            this.connection = connection.Connection;
         }
 
         /// <param name="TimeOut">The time to wait for the object being pulsed</param>
         public T Wait<T>(T TimeOutValue, uint TimeOut = 0)
         {
-            TimeOut = 0;
+            if (!connection.Client.Handshaked)
+            {
+                if (Debugger.IsAttached)
+                {
+                    TimeOut = 0;
+                }
+            }
+
             if (Pulsed)
                 return (T)Value;
 
-            Stopwatch waitTime = Stopwatch.StartNew();
+            //Stopwatch waitTime = Stopwatch.StartNew();
+            int waitTime = 0;
 
             lock (LockedObject)
             {
@@ -43,7 +63,8 @@ namespace SecureSocketProtocol2.Network
                     {
                         //Monitor.Wait(LockedObject, (int)TimeOut);
                         Monitor.Wait(LockedObject, 250);
-                        this.TimedOut = waitTime.ElapsedMilliseconds >= TimeOut;
+                        waitTime += 250;
+                        this.TimedOut = waitTime > TimeOut;
 
                         if (this.TimedOut)
                             return (T)TimeOutValue;

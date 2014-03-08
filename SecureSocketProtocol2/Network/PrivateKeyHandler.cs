@@ -10,7 +10,7 @@ namespace SecureSocketProtocol2.Network
     internal class PrivateKeyHandler
     {
         public const int Max_Private_Keys = 1000;
-        public const int Min_Private_Keys = 100; //if less then xx amount of private keys are available generate new keys
+        public const int Min_Private_Keys = 10; //if less then xx amount of private keys are available generate new keys
 
         private List<RSAEncryption> PrivateKeys;
         private List<DiffieHellman> DiffieHellmans;
@@ -18,9 +18,11 @@ namespace SecureSocketProtocol2.Network
         private Thread GenThread;
         private Random rnd;
         private object GenLock = new object();
+        private bool GenerateInBackground;
 
-        public PrivateKeyHandler()
+        public PrivateKeyHandler(bool GenerateInBackground)
         {
+            this.GenerateInBackground = GenerateInBackground;
             this.PrivateKeys = new List<RSAEncryption>();
             this.DiffieHellmans = new List<DiffieHellman>();
             this.rnd = new Random(DateTime.Now.Millisecond);
@@ -28,6 +30,9 @@ namespace SecureSocketProtocol2.Network
 
         public RSAEncryption GetPrivateKey()
         {
+            if(!GenerateInBackground)
+                return GenerateRsaKey();
+
             if (PrivateKeys.Count == 0)
             {
                 if (GenThread == null)
@@ -58,6 +63,9 @@ namespace SecureSocketProtocol2.Network
 
         public DiffieHellman GetDiffieHellman()
         {
+            if(!GenerateInBackground)
+                return GenerateDiffieHellman();
+
             if (DiffieHellmans.Count == 0)
             {
                 if (GenThread == null)

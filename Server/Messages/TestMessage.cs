@@ -1,4 +1,5 @@
-﻿using SecureSocketProtocol2.Network.Messages;
+﻿using SecureSocketProtocol2.Interfaces;
+using SecureSocketProtocol2.Network.Messages;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,6 +15,11 @@ namespace Server.Messages
             : base()
         {
 
+        }
+
+        public override void ProcessPayload(IClient client, SecureSocketProtocol2.Plugin.IPlugin plugin = null)
+        {
+            base.ProcessPayload(client, plugin);
         }
     }
 }

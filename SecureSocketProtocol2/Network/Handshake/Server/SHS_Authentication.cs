@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -45,18 +46,18 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             {
                 if (!base.ReceiveMessage((IMessage message) =>
                 {
-                    MsgAuthenication msgAuth = message as MsgAuthenication;
+                    MsgAuthentication msgAuth = message as MsgAuthentication;
                     if (msgAuth != null)
                     {
                         //todo: check password if it only contains the character it should have
                         try
                         {
                             bool success = Client.onAuthentication(msgAuth.Username, msgAuth.Password);
-                            base.SendMessage(new MsgAuthenicationSuccess(success));
+                            base.SendMessage(new MsgAuthenticationSuccess(success));
                         }
                         catch
                         {
-                            base.SendMessage(new MsgAuthenicationSuccess(false));
+                            base.SendMessage(new MsgAuthenticationSuccess(false));
                         }
                         return true;
                     }
@@ -64,11 +65,11 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                     {
                         return false;
                     }
-                    base.SendMessage(new MsgAuthenicationSuccess(false));
+                    base.SendMessage(new MsgAuthenticationSuccess(false));
                     return false;
                 }).Wait<bool>(false, 30000))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     return false;
                 }
             }
@@ -82,7 +83,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                     return message as MsgDummy != null;
                 })).Wait<bool>(false, 30000))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     Client.onException(new Exception("Handshake went wrong, SHS_Authentication"), ErrorType.Core);
                     throw new Exception(OutOfSyncMessage);
                 }

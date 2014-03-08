@@ -1,4 +1,5 @@
-﻿using SecureSocketProtocol2.Misc;
+﻿using SecureSocketProtocol2.Interfaces;
+using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Protections.Cache;
 using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Network.Protections.Encryption;
@@ -54,12 +55,6 @@ namespace SecureSocketProtocol2.Network.Protections
         {
             this.connection = connection;
             this.Protections = new SortedList<ProtectionType, List<IProtection>>();
-
-            //AddProtection(new AesProtection(connection));
-            AddProtection(new TcpWopProtection());
-            //AddProtection(new UdpWopProtection());
-            //AddProtection(new QuickLzProtection());
-            //AddProtection(new UnsafeXorProtection());
         }
 
         /// <summary>
@@ -81,11 +76,11 @@ namespace SecureSocketProtocol2.Network.Protections
             }
         }
 
-        internal byte[] ApplyProtection(byte[] Data, uint Offset, ref uint Length, ref PacketHeader header)
+        internal byte[] ApplyProtection(byte[] Data, ref uint Offset, ref uint Length, ref PacketHeader header)
         {
-            ApplyProtection(ref Data, Offset, ref Length, ref header, ProtectionType.Cache);
-            ApplyProtection(ref Data, Offset, ref Length, ref header, ProtectionType.Compression);
-            ApplyProtection(ref Data, Offset, ref Length, ref header, ProtectionType.Encryption);
+            ApplyProtection(ref Data, ref Offset, ref Length, ref header, ProtectionType.Cache);
+            ApplyProtection(ref Data, ref Offset, ref Length, ref header, ProtectionType.Compression);
+            ApplyProtection(ref Data, ref Offset, ref Length, ref header, ProtectionType.Encryption);
             return Data;
         }
 
@@ -104,7 +99,7 @@ namespace SecureSocketProtocol2.Network.Protections
             return Data;
         }
 
-        private void ApplyProtection(ref byte[] Data, uint Offset, ref uint Length, ref PacketHeader header, ProtectionType Type)
+        private void ApplyProtection(ref byte[] Data, ref uint Offset, ref uint Length, ref PacketHeader header, ProtectionType Type)
         {
             if (Protections.ContainsKey(Type))
             {

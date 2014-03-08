@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -45,10 +46,10 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             if ((Properties.Username != null && Properties.Username.Length > 0) &&
                 (Properties.Password != null && Properties.Password.Length > 0))
             {
-                base.SendMessage(new MsgAuthenication(Properties.Username, Properties.Password));
+                base.SendMessage(new MsgAuthentication(Properties.Username, Properties.Password));
                 if (!(syncObject = base.ReceiveMessage((IMessage message) =>
                 {
-                    MsgAuthenicationSuccess authResponse = message as MsgAuthenicationSuccess;
+                    MsgAuthenticationSuccess authResponse = message as MsgAuthenticationSuccess;
 
                     if (authResponse != null)
                     {
@@ -57,7 +58,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                     return false;
                 })).Wait<bool>(false, 30000))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     Client.onException(new Exception("Handshake went wrong, CHS_Authentication"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new TimeoutException(TimeOutMessage);
@@ -73,7 +74,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                     return message as MsgDummy != null;
                 })).Wait<bool>(false, 30000))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     Client.onException(new Exception("Handshake went wrong, CHS_Authentication"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new TimeoutException(TimeOutMessage);

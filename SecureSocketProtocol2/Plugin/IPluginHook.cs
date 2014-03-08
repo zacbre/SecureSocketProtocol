@@ -1,4 +1,5 @@
-﻿using SecureSocketProtocol2.Misc;
+﻿using SecureSocketProtocol2.Interfaces;
+using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
 using SecureSocketProtocol2.Network.Messages;
 using System;

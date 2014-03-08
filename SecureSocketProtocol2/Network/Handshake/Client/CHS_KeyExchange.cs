@@ -4,6 +4,7 @@ using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Handshake.Server;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
@@ -66,7 +67,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             {
                 if (syncObject.TimedOut)
                     throw new TimeoutException(TimeOutMessage);
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 throw new Exception("The RSA Exchange failed");
             }
 
@@ -100,11 +101,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                     if (index <= 4)
                         index = 10;
 
-                    //get the key length
-                    byte[] diffieLen = new byte[4];
-                    Array.Copy(mse.Key, index - 4, diffieLen, 0, diffieLen.Length);
-
-                    byte[] diffieData = new byte[BitConverter.ToInt32(diffieLen, 0)];
+                    byte[] diffieData = new byte[BitConverter.ToInt32(mse.Key, (int)(index - 4))]; //get the key length
                     Array.Copy(mse.Key, index, diffieData, 0, diffieData.Length); //copy the diffie-hellman key in between random data
 
                     //fix RSA Encrypted Data
@@ -136,7 +133,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 return false;
             })).Wait<bool>(false, 30000))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 Client.onException(new Exception("Handshake went wrong, CHS_KeyExchange"), ErrorType.Core);
                 if (!BlockedCertificate)
                 {

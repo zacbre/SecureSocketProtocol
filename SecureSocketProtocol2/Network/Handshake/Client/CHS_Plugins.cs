@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using SecureSocketProtocol2.Plugin;
 using System;
 using System.Collections.Generic;
@@ -67,7 +68,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                 return true;
             })).Wait<bool>(false))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 if (syncObject.TimedOut)
                     throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
                 throw new Exception("Failed to retrieve the plugin information");
@@ -75,7 +76,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
 
             if (Plugins.Length != PluginCount)
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 throw new Exception("The client is missing a few plugin(s), add the plugin(s) in order to connect");
             }
             for (int i = 0; i < PluginCount; i++)
@@ -103,7 +104,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                     return true;
                 })).Wait<bool>(false))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     if (syncObject.TimedOut)
                         throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");
                     throw new Exception("Failed to retrieve the plugin information");
@@ -146,7 +147,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
                     return true;
                 })).Wait<bool>(false))
                 {
-                    Client.Disconnect();
+                    Client.Disconnect(DisconnectReason.TimeOut);
                     Client.onException(new Exception("Handshake went wrong, CHS_Plugins"), ErrorType.Core);
                     if (syncObject.TimedOut)
                         throw new Exception("A timeout occured, this means the server did not respond for ~30 seconds");

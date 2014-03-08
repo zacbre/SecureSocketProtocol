@@ -20,6 +20,14 @@ namespace SecureSocketProtocol2.Network
             }
         }
 
+        public byte[] Buffer
+        {
+            get
+            {
+                return base.vStream.GetBuffer();
+            }
+        }
+
         /// <summary>
         /// Initialize the Network Payload Writer
         /// </summary>

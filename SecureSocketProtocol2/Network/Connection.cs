@@ -6,11 +6,14 @@ using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Channels;
+using SecureSocketProtocol2.Network.Messages.TCP.StreamMessages;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Network.Protections.Cache;
 using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Network.Protections.Encryption;
 using SecureSocketProtocol2.Plugin;
+using SecureSocketProtocol2.Shared;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -23,12 +26,22 @@ using System.Threading;
 
 namespace SecureSocketProtocol2.Network
 {
-    public class Connection
+    public sealed partial class Connection
     {
         internal const ReceivePerformance ProcessSpeed = ReceivePerformance.Safe;
-        public const int MAX_PAYLOAD = 10000000;
+        public const int MAX_PAYLOAD = (1024 * 1024) * 5; //5MB is max to be received at once
         public const int MAX_CACHE_SIZE = 1000000; //decrease value to reduce memory usage
         public const int RSA_KEY_SIZE = 2048; //change to a higher value if you feel paranoid
+        public const ChecksumHash HandshakeChecksum = ChecksumHash.SHA512;
+
+        internal static readonly byte[] VALIDATION = new byte[]
+        {
+            151, 221, 126, 222, 126, 142, 126, 208, 107, 209, 212, 218, 228, 167, 158, 252, 105, 147, 185, 178,
+            239, 238, 156, 228, 202, 141, 199, 198, 168, 199, 186, 121, 173, 166, 139, 225, 118, 162, 112, 252,
+            208, 253, 200, 163, 161, 113, 200, 118, 206, 203, 252, 242, 202, 124, 107, 165, 224, 205, 221, 184,
+            153, 161, 215, 146, 246, 166, 247, 135, 247, 107, 223, 160, 126, 193, 150, 248, 187, 219, 141, 211,
+            135, 227, 157, 107, 184, 183, 125, 161, 142, 194, 150, 201, 224, 146, 210, 130, 244, 202, 181, 228
+        };
 
         public int HEADER_SIZE
         {
@@ -37,7 +50,6 @@ namespace SecureSocketProtocol2.Network
                 return (int)(29 + protection.LayerCount + Client.HeaderTrashCount);
             }
         }
-
 
         public SSPClient Client { get; private set; }
         public ulong BytesOut { get; private set; }
@@ -50,35 +62,20 @@ namespace SecureSocketProtocol2.Network
 
         internal Protection protection { get; private set; }
         public bool UsingPrivateKey { get { return protection.UsingPrivateKey; } }
-        private SocketAsyncEventArgs asyncReceiveEvent;
         private NetworkStream stream;
         private PacketQueue packetQueue;
         public PluginSystem pluginSystem { get; private set; }
 
-        //just some queue's to make everything more simple
-        //just also incase you want to open/close channels while you're receiving data
-        private TaskQueue<ChannelRecvInfo> ChannelPayloadQueue;
-        private TaskQueue<IMessage> CloseChannelQueue;
-        private TaskQueue<IMessage> DisconnectedQueue;
-        private TaskQueue<IMessage> OpenChannelQueue;
-        private TaskQueue<IMessage> OpenChannelResponseQueue;
-        private TaskQueue<IMessage> PacketTaskQueue;
-        private TaskQueue<IMessage> PayloadQueue;
-        private TaskQueue<IMessage> KeepAliveQueue;
-        private TaskQueue<PluginRecvInfo> PluginDataQueue;
-
         internal Stopwatch KeepAliveSW = new Stopwatch();
         internal Stopwatch LastPacketSW = new Stopwatch();
-        internal MessageHandler messageHandler;
+        internal MessageHandler messageHandler { get; private set; }
 
-        internal static readonly byte[] VALIDATION = new byte[]
-        {
-            151, 221, 126, 222, 126, 142, 126, 208, 107, 209, 212, 218, 228, 167, 158, 252, 105, 147, 185, 178,
-            239, 238, 156, 228, 202, 141, 199, 198, 168, 199, 186, 121, 173, 166, 139, 225, 118, 162, 112, 252,
-            208, 253, 200, 163, 161, 113, 200, 118, 206, 203, 252, 242, 202, 124, 107, 165, 224, 205, 221, 184,
-            153, 161, 215, 146, 246, 166, 247, 135, 247, 107, 223, 160, 126, 193, 150, 248, 187, 219, 141, 211,
-            135, 227, 157, 107, 184, 183, 125, 161, 142, 194, 150, 201, 224, 146, 210, 130, 244, 202, 181, 228
-        };
+        internal SortedList<decimal, SecureStream> Streams;
+
+        //LiteCode
+        internal SortedList<decimal, SyncObject> Requests { get; private set; }
+        internal SortedList<string, SharedClass> SharedClasses { get; private set; }
+        internal SortedList<int, SharedClass> InitializedClasses { get; private set; }
 
         private Socket Handle
         {
@@ -105,607 +102,21 @@ namespace SecureSocketProtocol2.Network
             this.PayloadQueue = new TaskQueue<IMessage>(client, onPayloadQueue, 100);
             this.KeepAliveQueue = new TaskQueue<IMessage>(client, onKeepAliveQueue, 10);
             this.PluginDataQueue = new TaskQueue<PluginRecvInfo>(client, onPluginDataQueue, 100);
+            this.StreamQueue = new TaskQueue<IMessage>(client, onStreamQueue, 5); //making it 5 on purpose
+            this.LiteCodeQueue = new TaskQueue<IMessage>(client, onLiteCodeQueue, 100);
+            this.LiteCodeResponseQueue = new TaskQueue<IMessage>(client, onLiteCodeResponseQueue, 100);
+            this.LiteCodeDelegateQueue = new TaskQueue<IMessage>(client, onLiteCodeDelegateQueue, 100);
+
             this.messageHandler = new MessageHandler(0);
             this.pluginSystem = new PluginSystem(client);
             this.protection = new Protection(this);
+            this.Streams = new SortedList<decimal, SecureStream>();
+            this.Requests = new SortedList<decimal, SyncObject>();
+            this.SharedClasses = new SortedList<string, SharedClass>();
+            this.InitializedClasses = new SortedList<int, SharedClass>();
         }
 
-
-        /// <summary>
-        /// Used to keep receiving data from it's destination
-        /// </summary>
-        internal void StartNetworkStream()
-        {
-            if (stream != null)
-                return; //don't start the network stream twice
-
-            this.stream = new NetworkStream(this, networkStreamCallback);
-
-            asyncReceiveEvent = new SocketAsyncEventArgs();
-            asyncReceiveEvent.Completed += AsyncSocketCallback;
-            //asyncReceiveEvent.SetBuffer(stream.Buffer, 0, stream.Buffer.Length);
-
-            asyncReceiveEvent.SetBuffer(new byte[70000], 0, 70000);
-            if (!Handle.ReceiveAsync(asyncReceiveEvent))
-                AsyncSocketCallback(null, this.asyncReceiveEvent);
-        }
-
-        private void AsyncSocketCallback(object o, SocketAsyncEventArgs e)
-        {
-            if (e.SocketError == SocketError.SocketError || e.BytesTransferred == 0)
-            {
-                try
-                {
-                    Client.Disconnect();
-                }
-                catch (Exception ex)
-                {
-                    Client.onException(ex, ErrorType.Core);
-                }
-                return;
-            }
-
-            this.LastPacketSW = Stopwatch.StartNew();
-
-            switch (e.LastOperation)
-            {
-                case SocketAsyncOperation.Receive:
-                {
-                    try
-                    {
-                        //let's check the certificate
-                        if (Client.Certificate.ValidFrom > DateTime.Now)
-                        {
-                            //we need to wait till the time is right
-                            Client.Disconnect();
-                            return;
-                        }
-                        if (Client.Certificate.ValidTo < DateTime.Now)
-                        {
-                            //certificate is not valid anymore
-                            Client.Disconnect();
-                            return;
-                        }
-
-                        BytesIn += (ulong)e.BytesTransferred;
-                        //to make it 2x faster remove Array.Copy and set buffer offset in asyncReceiveEvent
-                        //too bad i've not acomplished this yet some really weird shit is happening then
-                        int writeOffset = stream.Write(e.Buffer, 0, e.BytesTransferred);
-                        this.stream.Flush();
-
-                        if (!Handle.ReceiveAsync(asyncReceiveEvent))
-                            AsyncSocketCallback(null, this.asyncReceiveEvent);
-                    }
-                    catch (Exception ex)
-                    {
-                        /*if (Client.ServerAllowsReconnecting)
-                        {
-                            Client.Connect(ConnectionState.Reconnecting);
-                        }
-                        else*/
-                        {
-                            Client.Disconnect();
-                            Client.onException(ex, ErrorType.Core);
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-
-        private unsafe void networkStreamCallback(Network.NetworkStream stream)
-        {
-            lock (stream)
-            {
-                bool DataAvailable = true;
-                while (DataAvailable)
-                {
-                    switch (this.stream.ReceiveState)
-                    {
-                        case ReceiveType.Header:
-                        {
-                            if (stream.CanRead(HEADER_SIZE))
-                            {
-                                byte[] headerData = new byte[HEADER_SIZE];
-                                if (stream.Read(ref headerData, 0, headerData.Length) > 0)
-                                {
-                                    //wopEncryption.Decrypt(header, 0, HEADER_SIZE);
-                                    stream.NetworkPayload.Header = new PacketHeader(headerData, 0, this);
-
-                                    if (!DPI.Inspect(stream.NetworkPayload.Header))
-                                    {
-                                        Client.Handle.Close();
-                                        return;
-                                    }
-                                    this.stream.ReceiveState = ReceiveType.Payload;
-                                }
-                            }
-                            else
-                            {
-                                DataAvailable = false;
-                            }
-                            break;
-                        }
-                        case ReceiveType.Payload:
-                        {
-                            if (stream.CanRead(stream.NetworkPayload.Header.PacketSize))
-                            {
-                                int receivedSize = stream.NetworkPayload.Header.PacketSize;
-                                uint packetSize = (uint)stream.NetworkPayload.Header.PacketSize;
-                                byte[] payload = stream.Buffer;
-                                uint offset = (uint)stream.Position;
-                                PacketHeader header = stream.NetworkPayload.Header;
-                                IPlugin plugin = null;
-
-                                if (stream.NetworkPayload.Header.PacketID == PacketId.PluginPacket)
-                                {
-                                    plugin = pluginSystem.GetPlugin(stream.NetworkPayload.Header.PluginId);
-
-                                    if (plugin == null)
-                                        throw new Exception("Plugin not found");
-                                }
-
-                                if (Client.Certificate != null)
-                                {
-                                    switch (Client.Certificate.Checksum)
-                                    {
-                                        case ChecksumHash.CRC32:
-                                        {
-                                            CRC32 hash = new CRC32();
-                                            uint Hash = BitConverter.ToUInt32(hash.ComputeHash(payload, (int)offset, (int)packetSize), 0);
-
-                                            if (stream.NetworkPayload.Header.Hash != Hash)
-                                            {
-
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                //decrypt, decompress, de-cache the data we received
-                                if (plugin != null && plugin.UseOwnProtection)
-                                {
-                                    payload = plugin.protection.RemoveProtection(payload, ref offset, ref packetSize, ref stream.NetworkPayload.Header);
-                                }
-                                else
-                                {
-                                    payload = protection.RemoveProtection(payload, ref offset, ref packetSize, ref stream.NetworkPayload.Header);
-                                }
-
-
-                                /*
-                                if (stream.NetworkPayload.isCached)
-                                {
-                                    payload = ReceiveCache.DeCache(payload, offset, packetSize);
-                                    offset = 0;
-                                    packetSize = payload.Length;
-                                }*/
-
-                                IMessage message = null;
-                                try
-                                {
-                                    message = messageHandler.HandleMessage(new PayloadReader(payload) { Offset = (int)offset }, stream.NetworkPayload.Header.MessageId);
-
-                                    if (message != null)
-                                    {
-                                        message.RawSize = stream.NetworkPayload.Header.PacketSize;
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Client.onException(ex, ErrorType.Core);
-                                    return;
-                                }
-
-                                if (!Client.DPI.Inspect(null, message))
-                                {
-                                    Client.Disconnect();
-                                    return;
-                                }
-
-                                /*if(ProcessSpeed == ReceivePerformance.Unsafe)
-                                {
-                                    if(!MovedPayload && plugin != null && (plugin.UseOwnSystem))
-                                    {
-                                        //payload is not moved from memory and plugin is using his own system
-                                        //We'll just copy the memory...
-                                        payload = new byte[packetSize];
-                                        fixed (byte* dataPtr = payload, streamPtr = stream.Buffer)
-                                        {
-                                            NativeMethods.memcpy(dataPtr, streamPtr, (uint)packetSize);
-                                        }
-                                    }
-                                }*/
-
-                                switch (stream.NetworkPayload.Header.PacketID)
-                                {
-                                    case PacketId.PacketQueue:
-                                    {
-                                        PacketTaskQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.ChannelPayload:
-                                    {
-                                        ChannelPayloadQueue.Enqueue(new ChannelRecvInfo(message, stream.NetworkPayload.Header.ChannelId));
-                                        break;
-                                    }
-                                    case PacketId.CloseChannel:
-                                    {
-                                        CloseChannelQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.Disconnected:
-                                    {
-                                        DisconnectedQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.KeepAlive:
-                                    {
-                                        KeepAliveQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.OpenChannel:
-                                    {
-                                        OpenChannelQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.OpenChannelResponse:
-                                    {
-                                        OpenChannelResponseQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.Payload:
-                                    {
-                                        PayloadQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.PluginPacket:
-                                    {
-                                        PluginDataQueue.Enqueue(new PluginRecvInfo(plugin, message, payload));
-                                        break;
-                                    }
-                                }
-
-                                this.stream.ReceiveState = ReceiveType.Header;
-                                stream.Position += receivedSize;
-                                payload = null;
-                            }
-                            else
-                            {
-                                DataAvailable = false;
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        private void onKeepAliveQueue(IMessage message)
-        {
-            this.KeepAliveSW = Stopwatch.StartNew();
-            Client.onKeepAlive();
-        }
-        private void onChannelPayloadQueue(ChannelRecvInfo channelInfo)
-        {
-            lock (Client.channels)
-            {
-                Channel channel = null;
-                if (Client.channels.TryGetValue(channelInfo.ChannelId, out channel))
-                {
-                    try
-                    {
-                        if (channel.State == ConnectionState.Open)
-                        {
-                            channel.onReceiveMessage(channelInfo.Message);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Client.onException(ex, ErrorType.UserLand);
-                    }
-                }
-            }
-        }
-        private void onCloseChannelQueue(IMessage message)
-        {
-            MsgCloseChannel msg = message as MsgCloseChannel;
-            if ((msg = message as MsgCloseChannel) != null)
-                msg.ProcessPayload(Client);
-        }
-        private void onDisconnectedQueue(IMessage message)
-        {
-            MsgDisconnected msg = message as MsgDisconnected;
-            if ((msg = message as MsgDisconnected) != null)
-                msg.ProcessPayload(Client);
-        }
-        private void onOpenChannelQueue(IMessage message)
-        {
-            MsgOpenChannel msg = message as MsgOpenChannel;
-            if ((msg = message as MsgOpenChannel) != null)
-                msg.ProcessPayload(Client);
-        }
-        private void onOpenChannelResponseQueue(IMessage message)
-        {
-            MsgOpenChannelResponse msg = message as MsgOpenChannelResponse;
-            if ((msg = message as MsgOpenChannelResponse) != null)
-                msg.ProcessPayload(Client);
-        }
-        private void onPluginDataQueue(PluginRecvInfo pluginInfo)
-        {
-            if (pluginInfo.Plugin.AllowPluginHooks() && pluginInfo.Plugin.Hooks.Count > 0)
-            {
-                bool Continue = true;
-                foreach (IPluginHook hook in pluginInfo.Plugin.Hooks)
-                {
-                    IMessage message = pluginInfo.message;
-                    if (!hook.onReceiveMessage(ref message))
-                        Continue = false;
-                    pluginInfo.message = message;
-                }
-                if (!Continue)
-                    return;
-            }
-            pluginInfo.Plugin.onReceiveMessage(pluginInfo.message);
-        }
-        private void onPacketTaskQueue(IMessage message)
-        {
-            /*PayloadReader pr = new PayloadReader(payload);
-            while(pr.Offset < payload.Length)
-            {
-                PacketId packetId = (PacketId)pr.ReadByte();
-                byte Duplicates = pr.ReadByte();
-                byte[] data = pr.ReadBytes(pr.ReadThreeByteInteger());
-
-                if(packetId != PacketId.Payload && packetId != PacketId.ChannelPayload)
-                {
-                    //um... wat ?
-                    return;
-                }
-
-                for(; Duplicates > 0; Duplicates--)
-                {
-                    switch(packetId)
-                    {
-                        case PacketId.Payload:
-                        {
-                            try
-                            {
-                                if(DPI.Inspect(data, false))
-                                {
-                                    if(client.MultiThreadProcessing)
-                                    {
-                                        ThreadPool.QueueUserWorkItem((object o) => client.onReceiveData(data, 0, data.Length));
-                                    }
-                                    else
-                                    {
-                                        client.onReceiveData(data, 0, data.Length);
-                                    }
-                                }
-                            }
-                            catch(Exception ex)
-                            {
-                                client.onException(ex);
-                            }
-                            break;
-                        }
-                        case PacketId.ChannelPayload:
-                        {
-                            //new R_ChannelPayload(data) { RawSize = data.Length }.ReadPayload(this);
-                            break;
-                        }
-                    }
-                }
-            }*/
-        }
-
-        private void onPayloadQueue(IMessage message)
-        {
-            try
-            {
-                //if (DPI.Inspect(packetInfo.Data, false))
-                {
-                    if (Client.MultiThreadProcessing)
-                    {
-                        ThreadPool.QueueUserWorkItem((object o) =>
-                        {
-                            IMessage msg = o as IMessage;
-                            Client.onReceiveMessage(msg);
-                        }, message);
-                    }
-                    else
-                    {
-                        Client.onReceiveMessage(message);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Client.onException(ex, ErrorType.UserLand);
-            }
-        }
-
-        internal void SendPacketQueue(byte[] data, int offset, int length, PacketId packetId)
-        {
-            lock (Client)
-            {
-                Array.Copy(data, offset, data, 0, length);
-                Array.Resize(ref data, length);
-                packetQueue.QueuePacket(data, packetId);
-            }
-        }
-
-        internal void SendPacket(IMessage message, PacketId packetId, bool compress = true, bool cache = true, Channel channel = null)
-        {
-            lock (Client)
-            {
-                //clear the packet queue by sending all the stuff that had to be sended
-                packetQueue.CleanQueue();
-                SendPayload(message, packetId, null, compress, cache, null, channel);
-            }
-        }
-
-        internal unsafe void SendPayload(IMessage message, PacketId packetId, IPlugin plugin = null, bool compress = true, bool cache = true,
-                                         PluginHeaderCallback HeaderCallback = null, Channel channel = null)
-        {
-            NetworkPayloadWriter temp = message.WritePacket(message, this, plugin, HeaderCallback);
-            message.RawSize = temp.Length - HEADER_SIZE;
-            SendPayload(temp, messageHandler.GetMessageId(message.GetType()), packetId, plugin, compress, cache, channel);
-        }
-
-        private unsafe void SendPayload(NetworkPayloadWriter npw, uint MessageId, PacketId packetId, IPlugin plugin = null,
-                                        bool compress = true, bool cache = true, Channel channel = null)
-        {
-            lock (ClientSendLock)
-            {
-                cache = false;
-
-                PacketHeader header = new PacketHeader(this);
-                uint offset = (uint)HEADER_SIZE;
-                uint PayloadLength = (uint)npw.PayloadSize;
-                byte[] payload = npw.GetBuffer();
-
-                //apply the encryption(s), compression(s) and cache
-                /*if(plugin != null)
-                    plugin.protection.ApplyProtection(npw.GetBuffer(), offset, ref length, ref header);
-                else*/
-                payload = protection.ApplyProtection(payload, offset, ref PayloadLength, ref header);
-
-                header.PacketSize = (int)PayloadLength;
-                header.PacketID = packetId;
-                header.ChannelId = channel != null ? channel.ConnectionId : 0;
-                
-                if (packetId == PacketId.PluginPacket)
-                {
-                    header.isPluginPacket = true;
-                    if (plugin != null)
-                    {
-                        header.PluginId = plugin.PluginId;
-                    }
-                }
-
-                header.CurPacketId = CurPacketId;
-                CurPacketId++;
-                header.MessageId = MessageId;
-                npw.vStream.Position = 0;
-                header.WriteHeader(payload, 0, (int)PayloadLength, npw);
-                npw.WriteBytes(payload, HEADER_SIZE, (int)PayloadLength);
-
-                //encrypt the header
-                /*wopEncryption.Encrypt(temp, 0, HEADER_SIZE);
-                if (this.EncryptionType == EncryptionType.Wop)
-                {
-                    wopEncryption.Encrypt(temp, HEADER_SIZE, npw.Length);
-                }
-                else if (this.EncryptionType == EncryptionType.UnsafeXor)
-                {
-                    unsafeXorEncryption.Encrypt(ref temp, HEADER_SIZE, npw.Length);
-                }*/
-
-                try
-                {
-                    this.Handle.Send(npw.GetBuffer(), (int)PayloadLength + HEADER_SIZE, SocketFlags.None);
-                    BytesOut += (ulong)(PayloadLength + HEADER_SIZE);
-                }
-                catch { }
-            }
-        }
-
-        internal SyncObject Receive(ReceiveCallback callback)
-        {
-            lock (Handle)
-            {
-                if (callback == null)
-                    throw new ArgumentNullException("callback");
-
-                if (!Connected)
-                    return null;
-
-                SyncObject syncObject = new SyncObject(this);
-                NetworkPayload networkPayload = new NetworkPayload(this, syncObject, callback);
-                SocketError error = SocketError.AccessDenied;
-                Handle.BeginReceive(networkPayload.Payload, 0, (int)networkPayload.PacketSize, SocketFlags.None, out error, ReceivePayloadCallback, networkPayload);
-                return syncObject;
-            }
-        }
-
-        private void ReceivePayloadCallback(IAsyncResult ar)
-        {
-            NetworkPayload networkPayload = (NetworkPayload)ar.AsyncState;
-            SocketError error = SocketError.AccessDenied;
-            int received = 0;
-
-            try
-            {
-                //even tho there is "out error" it can still throw a error
-                received = Handle.EndReceive(ar, out error);
-            }
-            catch { }
-
-            if (received <= 0 || error != SocketError.Success)
-            {
-                Client.Disconnect();
-                return;
-            }
-
-            BytesIn += (ulong)received;
-            this.LastPacketSW = Stopwatch.StartNew();
-
-            networkPayload.WriteOffset += (uint)received;
-            if (networkPayload.WriteOffset == networkPayload.PacketSize && networkPayload.ReceivedHeader)
-            {
-                //decrypt, decompress, de-cache the data we received
-                uint Offset = 0;
-                uint length = (uint)networkPayload.Payload.Length;
-                networkPayload.Payload = protection.RemoveProtection(networkPayload.Payload, ref Offset, ref length, ref networkPayload.Header);
-
-                IMessage message = null;
-
-                try
-                {
-                    message = messageHandler.HandleMessage(new PayloadReader(networkPayload.Payload), networkPayload.Header.MessageId);
-                }
-                catch
-                {
-                    
-                }
-
-                networkPayload.syncObject.Value = networkPayload.Callback(message);
-                networkPayload.syncObject.Pulse();
-                return; //no need to read futher
-            }
-
-            if (!networkPayload.ReceivedHeader && networkPayload.ReceivedPacket)
-            {
-                try
-                {
-                    networkPayload.ReceivedHeader = true;
-                    //wopEncryption.Decrypt(networkPayload.Payload, 0, HEADER_SIZE);
-                    networkPayload.Header = new PacketHeader(networkPayload.Payload, 0, this);
-
-                    if (!DPI.Inspect(networkPayload.Header))
-                    {
-                        Client.Disconnect();
-                        return;
-                    }
-
-                    networkPayload.PacketSize = networkPayload.Header.PacketSize;
-                    networkPayload.Payload = new byte[networkPayload.Header.PacketSize];
-                    networkPayload.WriteOffset = 0; //just reset offset for reading
-                }
-                catch
-                {
-                    Client.Disconnect();
-                    return;
-                }
-            }
-
-            if (networkPayload.WriteOffset != networkPayload.PacketSize)
-            {
-                Handle.BeginReceive(networkPayload.Payload, (int)networkPayload.WriteOffset, (int)(networkPayload.PacketSize - networkPayload.WriteOffset), SocketFlags.None, out error, ReceivePayloadCallback, networkPayload);
-            }
-        }
+        
 
         internal void ReConnect()
         {

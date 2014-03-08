@@ -1,6 +1,7 @@
 ﻿using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -65,7 +66,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 return false;
             }).Wait<bool>(false, 30000))
             {
-                Client.Disconnect();
+                Client.Disconnect(DisconnectReason.TimeOut);
                 Client.onException(new Exception("Handshake went wrong, SHS_Validation"), ErrorType.Core);
                 return false;
             }

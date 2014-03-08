@@ -37,7 +37,7 @@ namespace SecureSocketProtocol2
             if (serverProperties == null)
                 throw new ArgumentNullException("serverProperties");
 
-            this.KeyHandler = new PrivateKeyHandler();
+            this.KeyHandler = new PrivateKeyHandler(serverProperties.GenerateKeysInBackground);
             this.serverProperties = serverProperties;
             this.Clients = new SortedList<decimal, SSPClient>();
             this.baseClient = typeof(ClientType);
@@ -116,21 +116,21 @@ namespace SecureSocketProtocol2
                                 if (Clients.ContainsKey(client.ClientId))
                                     Clients.Remove(client.ClientId);
                             }
-                            client.Disconnect();
+                            client.Disconnect(DisconnectReason.HandShakeFailed);
                             return;
                         }
                     }
                     catch(Exception ex)
                     {
                         onException(ex);
-                        client.Disconnect();
+                        client.Disconnect(DisconnectReason.HandShakeFailed);
                         return;
                     }
                     client.State = ConnectionState.Open;
 
                     try
                     {
-                        client.onRegisterMessages(client.MessageHandler);
+                        client.onShareClasses();
                     }
                     catch (Exception ex)
                     {
@@ -204,7 +204,7 @@ namespace SecureSocketProtocol2
                         if (Clients.Values[i].Connection.KeepAliveSW.Elapsed.Seconds > 30 &&
                             Clients.Values[i].Connection.LastPacketSW.Elapsed.Seconds > 30)
                         {
-                            Clients.Values[i].Disconnect();
+                            Clients.Values[i].Disconnect(DisconnectReason.HardwareDisconnection);
                         }
                     }
                 }
@@ -224,7 +224,7 @@ namespace SecureSocketProtocol2
                 for (int i = 0; i < Clients.Count; i++)
                 {
                     try { Clients.Values[i].Handle.Close(); } catch { } //just close
-                    Clients.Values[i].Disconnect();
+                    Clients.Values[i].Disconnect(DisconnectReason.ServerShuttingDown);
                 }
             }
             Clients.Clear();

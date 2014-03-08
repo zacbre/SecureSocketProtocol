@@ -1,4 +1,5 @@
-﻿using SecureSocketProtocol2.Misc;
+﻿using SecureSocketProtocol2.Interfaces;
+using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Plugin;
 using System;
 using System.Collections.Generic;
@@ -28,35 +29,19 @@ namespace SecureSocketProtocol2.Network.Messages
 
         }
 
-        public NetworkPayloadWriter WritePacket(IMessage message, Connection connection, IPlugin plugin, PluginHeaderCallback HeaderCallback = null)
+        public NetworkPayloadWriter WritePacket(IMessage message, Connection connection)
         {
             NetworkPayloadWriter npw = new NetworkPayloadWriter(connection);
-            if (plugin != null)
-            {
-                uint size = plugin.PluginHeaderSize;
-                if (size > 0 && HeaderCallback != null)
-                {
-                    byte[] header = new byte[size];
-                    HeaderCallback(ref header);
-
-                    if (header != null)
-                    {
-                        npw.WriteBytes(header);
-                    }
-                }
-            }
-            WritePacket(message, npw, connection, plugin);
+            WritePacket(message, npw);
             return npw;
         }
 
-        public void WritePacket(IMessage message, NetworkPayloadWriter npw, Connection connection, IPlugin plugin)
+        public void WritePacket(IMessage message, NetworkPayloadWriter npw)
         {
-            npw.WriteBool(false); //cached or not
             //if (connection.messageHandler.SendCache.CacheMessage(npw, message))
-            //    return; //message is cached
+            //    return;
 
             FieldInfo[] fields = message.GetType().GetFields();
-
             for (int i = 0; i < fields.Length; i++)
             {
                 object obj = fields[i].GetValue(message);
@@ -91,12 +76,13 @@ namespace SecureSocketProtocol2.Network.Messages
         {
             bool isCached = false;
             IMessage CachedMsg = null;
-            handler.ReceiveCache.DeCacheMessage(message, pr, ref isCached, ref CachedMsg, handler);
+            //handler.ReceiveCache.DeCacheMessage(message, pr, ref isCached, ref CachedMsg, handler);
 
-            if (!isCached && CachedMsg != null)
+            //pr.ReadBool();
+            //if (!isCached && CachedMsg != null)
             {
                 FieldInfo[] fields = message.GetType().GetFields();
-                FieldInfo[] cachedFields = CachedMsg.GetType().GetFields();
+                //FieldInfo[] cachedFields = CachedMsg.GetType().GetFields();
 
                 for (int i = 0; i < fields.Length; i++)
                 {

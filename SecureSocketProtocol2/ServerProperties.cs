@@ -28,5 +28,8 @@ namespace SecureSocketProtocol2
 
         /// <summary> If keyfiles are being used it will make it harder to decrypt the traffic </summary>
         public abstract Stream[] KeyFiles { get; }
+
+        /// <summary> Generate private keys even before client(s) are connected, speeds up the connection process </summary>
+        public abstract bool GenerateKeysInBackground { get; }
     }
 }

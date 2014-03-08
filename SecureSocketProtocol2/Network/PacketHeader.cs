@@ -1,6 +1,8 @@
 ﻿using SecureSocketProtocol2.Hashers;
+using SecureSocketProtocol2.Misc;
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace SecureSocketProtocol2.Network
@@ -53,21 +55,16 @@ namespace SecureSocketProtocol2.Network
             pw.WriteBool(isPluginPacket);
             pw.WriteUShort(CurPacketId);
 
-            if (connection.Client.Certificate != null)
+            if (connection.Client.Certificate != null && connection.Client.Handshaked)
             {
-                if (payload != null && length > 0)
-                {
-                    switch(connection.Client.Certificate.Checksum)
-                    {
-                        case ChecksumHash.CRC32:
-                        {
-                            CRC32 hash = new CRC32();
-                            this.Hash = BitConverter.ToUInt32(hash.ComputeHash(payload, offset, length), 0);
-                            break;
-                        }
-                    }
-                }
+                Hash = HashPayload(payload, offset, length, connection.Client.Certificate.Checksum);
             }
+            else
+            {
+                //No certificate yet, always hash with SHA512
+                Hash = HashPayload(payload, offset, length, Connection.HandshakeChecksum);
+            }
+
             pw.WriteUInteger(Hash);
             pw.WriteUInteger(ChannelId);
 
@@ -75,7 +72,9 @@ namespace SecureSocketProtocol2.Network
             pw.WriteBytes(new byte[connection.protection.LayerCount]);
 
             //trash data
-            pw.WriteBytes(new byte[connection.Client.HeaderTrashCount]);
+            byte[] tempJumk = new byte[connection.Client.HeaderTrashCount];
+            new Random().NextBytes(tempJumk);
+            pw.WriteBytes(tempJumk);
         }
 
         public byte[] ToByteArray(Connection connection)
@@ -83,6 +82,57 @@ namespace SecureSocketProtocol2.Network
             NetworkPayloadWriter pw = new NetworkPayloadWriter(connection);
             WriteHeader(null, 0, 0, pw);
             return pw.GetPayload();
+        }
+
+        internal uint HashPayload(byte[] payload, int offset, int length, ChecksumHash HashType)
+        {
+            if (HashType == ChecksumHash.None)
+                return 0;
+
+            uint hash = 0;
+
+            BigInteger BigTemp = new BigInteger();
+            if (payload != null && length > 0)
+            {
+                if (ChecksumHash.CRC32 == (HashType & ChecksumHash.CRC32))
+                {
+                    using (CRC32 hasher = new CRC32())
+                    {
+                        BigTemp += new BigInteger(hasher.ComputeHash(payload, offset, length));
+                    }
+                }
+                if (ChecksumHash.MD5 == (HashType & ChecksumHash.MD5))
+                {
+                    using (MD5 hasher = MD5.Create())
+                    {
+                        BigTemp += new BigInteger(hasher.ComputeHash(payload, offset, length));
+                    }
+                }
+                if (ChecksumHash.SHA1 == (HashType & ChecksumHash.SHA1))
+                {
+                    using (SHA1 hasher = SHA1.Create())
+                    {
+                        BigTemp += new BigInteger(hasher.ComputeHash(payload, offset, length));
+                    }
+                }
+                if (ChecksumHash.SHA512 == (HashType & ChecksumHash.SHA512))
+                {
+                    using (SHA512 hasher = SHA512.Create())
+                    {
+                        BigTemp += new BigInteger(hasher.ComputeHash(payload, offset, length));
+                    }
+                }
+            }
+
+            //here is the point where the collisions could begin!
+            //Xor, Mod, later to fix it, for now let's leave it like this
+            do
+            {
+                hash += (uint)BigTemp.LongValue();
+                BigTemp >>= 32;
+            }
+            while (BigTemp > 0);
+            return hash;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecureSocketProtocol2.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -21,7 +22,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP
 
         }
 
-        public override void ProcessPayload(Misc.IClient client, Plugin.IPlugin plugin = null)
+        public override void ProcessPayload(IClient client, Plugin.IPlugin plugin = null)
         {
 
             base.ProcessPayload(client, plugin);

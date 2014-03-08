@@ -3,16 +3,19 @@ using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Protections;
+using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Plugin;
 using Server.LiteCode;
 using Server.Messages;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using TestPlugin;
 
 namespace Server
 {
@@ -24,37 +27,31 @@ namespace Server
         PayloadWriter pw = new PayloadWriter();
         Stopwatch speedSW = Stopwatch.StartNew();
 
+        private List<SecureStream> streams = new List<SecureStream>();
+
         public Client()
             : base(typeof(TestChannel), new object[0], true)
         {
 
         }
 
-        public override void onReceiveMessage(IMessage message)
-        {
-            TestMessage tm = message as TestMessage;
-            if (tm != null)
-            {
-                PacketsPerSec++;
-                Received += (ulong)message.RawSize;
-
-                if (speedSW.ElapsedMilliseconds >= 1000)
-                {
-                    Console.WriteLine("[TCP] last size:" + message.RawSize +
-                                      ", pps:" + PacketsPerSec +
-                                      ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]" +
-                                      ", bit:" + Math.Round(((float)((float)Received * 8F) / 1024F) / 1024F, 2));
-                    PacketsPerSec = 0;
-                    Received = 0;
-                    speedSW = Stopwatch.StartNew();
-                }
-            }
-        }
-
         public override void onClientConnect()
         {
             Console.WriteLine("Client accepted");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
+
+            while(false)
+            {
+                Console.Clear();
+                Console.WriteLine("Streams:" + streams.Count);
+
+                for (int i = 0; i < streams.Count; i++)
+                {
+                    Console.WriteLine("Streams[" + i + "] size buffer " + streams[i].Length);
+                }
+
+                Thread.Sleep(1000);
+            }
 
             /*while (true)
             {
@@ -68,14 +65,9 @@ namespace Server
             Console.WriteLine("Validating connection...");
         }
 
-        public override void onDisconnect()
+        public override void onDisconnect(DisconnectReason Reason)
         {
             Console.WriteLine("Client disconnected");
-        }
-
-        public override void onDeepPacketInspection(IMessage message)
-        {
-            
         }
 
         public override void onKeepAlive()
@@ -98,28 +90,6 @@ namespace Server
 
         }
 
-        public override void onReceiveUdpMessage(IMessage message)
-        {
-            PacketsPerSec++;
-            Received += (ulong)message.RawSize;
-
-            if (speedSW.ElapsedMilliseconds >= 1000)
-            {
-                Console.WriteLine("[UDP] last size:" + message.RawSize +
-                                  ", Packet /sec:" + PacketsPerSec +
-                                  ", data /sec:" + Received + " [" + Math.Round(((float)Received / 1024F) / 1024F, 2) + "MBps]" +
-                                  ", bit:" + Math.Round(((float)((float)Received * 8F) / 1024F) / 1024F, 2));
-                PacketsPerSec = 0;
-                Received = 0;
-                speedSW = Stopwatch.StartNew();
-            }
-        }
-
-        public override void onRegisterMessages(MessageHandler messageHandler)
-        {
-
-        }
-
         public override bool onVerifyCertificate(CertInfo certificate)
         {
             return true;
@@ -129,13 +99,13 @@ namespace Server
         {
             return new IPlugin[]
             {
-                new TestPlug()
+
             };
         }
 
         public override void onAddProtection(Protection protection)
         {
-
+            protection.AddProtection(new QuickLzProtection());
         }
 
         public override uint HeaderTrashCount
@@ -144,7 +114,7 @@ namespace Server
         }
         public override uint PrivateKeyOffset
         {
-            get { return 45532; }
+            get { return 45634232; }
         }
 
         public override bool onAuthentication(string Username, string Password)
@@ -160,6 +130,20 @@ namespace Server
         public override void onAuthenticated()
         {
 
+        }
+
+        public override void onNewStreamOpen(SecureStream stream)
+        {
+            streams.Add(stream);
+
+            stream.AutoFlush = true;
+            byte[] data = File.ReadAllBytes(@"C:\Users\DragonHunter\Desktop\ss (2013-05-22 at 09.30.58).jpg");
+            stream.Write(data, 0, data.Length);
+        }
+
+        public override void onShareClasses()
+        {
+            base.ShareClass("SharedTest", typeof(SharedTest));
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
+using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,6 +17,7 @@ namespace SecureSocketProtocol2.Network
         public abstract void onChannelOpen();
         public abstract void onChannelClosed();
         public abstract void onReceiveMessage(IMessage message);
+        public abstract void onDeepPacketInspection(IMessage message);
 
         public Channel()
         {
@@ -30,7 +32,7 @@ namespace SecureSocketProtocol2.Network
                 {
                     if (State == ConnectionState.Closed)
                         return ChannelError.ChannelClosed;
-                    Connection.SendPacket(message, PacketId.ChannelPayload, true, true, this);
+                    Connection.SendMessage(message, PacketId.ChannelPayload, this);
                 }
             }
             catch(Exception ex)
@@ -52,7 +54,7 @@ namespace SecureSocketProtocol2.Network
                             return;
 
                         this.State = ConnectionState.Closed;
-                        Connection.SendPacket(new MsgCloseChannel(this), PacketId.CloseChannel, true);
+                        Connection.SendMessage(new MsgCloseChannel(this), PacketId.CloseChannel);
                         Client.channels.Remove(this.ConnectionId);
                         onChannelClosed();
                     }
