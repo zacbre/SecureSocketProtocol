@@ -24,6 +24,9 @@ namespace SecureSocketProtocol2.Shared
 
         public object Invoke(params object[] args)
         {
+            if (sharedMethod.sharedClass.IsDisposed)
+                throw new Exception("The shared class is disposed");
+
             ReturnResult ret = sharedMethod.Invoke(args) as ReturnResult;
 
             if (ret != null)

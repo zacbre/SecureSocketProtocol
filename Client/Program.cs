@@ -22,6 +22,10 @@ using System.Windows.Forms;
 using Client.LiteCode;
 using SecureSocketProtocol2.Attributes;
 using SecureSocketProtocol2.Network.Protections.Compression;
+using SecureSocketProtocol2.Network.RootSocket;
+using SecureSocketProtocol2.Cache;
+using SecureSocketProtocol2.Cache.CacheMethods;
+using SecureSocketProtocol2.Network.Protections.Cache;
 
 namespace Client
 {
@@ -33,7 +37,7 @@ namespace Client
         static Stopwatch speedSW = Stopwatch.StartNew();
 
         public Program()
-            : base("127.0.0.1", 539, typeof(TestChannel), new object[0], new byte[]
+            : base(new ClientProperties("127.0.0.1", 444, typeof(TestChannel), new object[0], new byte[]
             { //private key, can be any size you want
                 80, 118, 131, 114, 195, 224, 157, 246, 141, 113,
                 186, 243, 77, 151, 247, 84, 70, 172, 112, 115,
@@ -42,14 +46,28 @@ namespace Client
             }, new Stream[]
             {//key files
                 //new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
-            },//login
-               "Dergan", "Hunter:)")
+            }, null, 30000,//login
+               "Dergan", "Hunter:)"))
         {
 
         }
 
         static void Main(string[] args)
         {
+            byte[] data = new byte[] { 1,2,3,4,5,6,7,8,9 };
+
+            MemoryStream InStream = new MemoryStream();
+            MemoryStream OutStream = new MemoryStream();
+
+            ICache cache = new SimpleCache(5000000);
+            cache.Cache(data, 0, data.Length, InStream);
+            cache.Decache(InStream.ToArray(), 0, (int)InStream.Length, OutStream);
+
+            InStream = new MemoryStream();
+            OutStream = new MemoryStream();
+            cache.Cache(data, 0, data.Length, InStream);
+            cache.Decache(InStream.ToArray(), 0, (int)InStream.Length, OutStream);
+
             /*WopEncryption wopEncryption = new WopEncryption(new ulong[] {
                 861335890, 388626021, 404588533, 738562051, 143466081,
                 813679996, 890571662, 823294427, 135787739, 421508041,
@@ -167,10 +185,34 @@ namespace Client
 
         public override void onClientConnect()
         {
-            Console.Title = "SSP2 Client - ClientId:" + base.ClientId;
+            Console.WriteLine("Virtual IP: " + base.VirtualIP);
+            Console.Title = "SSP2 Client - ClientId:" + base.ClientId.ToString().Substring(0, 10) + "... - VritualIP:" + base.VirtualIP;
             Console.WriteLine("Connected");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
             ISharedTest SharedTest = base.GetSharedClass<ISharedTest>("SharedTest");
+
+
+            string ResolvedDns = base.ResolveDns("TestRootSocket");
+            if (ResolvedDns.Length == 0)
+            {
+                base.RegisterDns("TestRootSocket");
+                return;
+            }
+
+            //peer found, connect to it
+            Console.WriteLine("Connecting to peer " + ResolvedDns);
+            Peer peer = new Peer();
+            PeerErrorCode errorCode = base.ConnectToPeer(ResolvedDns, peer);
+
+            if (errorCode == PeerErrorCode.Success)
+            {
+                Console.WriteLine("Connected to peer");
+                while (true)
+                {
+                    peer.SendMessage(new TestMessage());
+                }
+            }
+            return;
 
             Benchmark BenchLiteCode = new Benchmark();
             int speedy = 0;
@@ -195,8 +237,8 @@ namespace Client
             int count = 0;
             Benchmark BenchFiles = new Benchmark();
 
-            Image img = (Image)Bitmap.FromStream(ImgStream);
-            img.Save(@"C:\Users\DragonHunter\Desktop\DownloadedSSP_Image.png");
+            //Image img = (Image)Bitmap.FromStream(ImgStream);
+            //img.Save(@"C:\Users\DragonHunter\Desktop\DownloadedSSP_Image.png");
 
             while (false)
             {
@@ -211,7 +253,7 @@ namespace Client
             TestMessage message = new TestMessage();
             int ChannelsClosed = 0;
 
-            /*while(false)
+            while(true)
             {
                 TestChannel channel = new TestChannel();
                 
@@ -230,18 +272,18 @@ namespace Client
                         sw = Stopwatch.StartNew();
                     }
                 }
-            }*/
+            }
 
             RandomDecimal rndDec = new RandomDecimal(DateTime.Now.Millisecond);
 
             while (base.Connected)
             {
                 packets++;
-
+                SharedTest.SendByteArray(message.Stuff);
 
                 if (sw.ElapsedMilliseconds >= 1000)
                 {
-                    Console.WriteLine("last data size: " + message.RawSize + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
+                    Console.WriteLine("last data size: " + message.Stuff + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
                     packets = 0;
                     DataPerSec = 0;
                     sw = Stopwatch.StartNew();
@@ -305,6 +347,7 @@ namespace Client
             Console.WriteLine("Unit: " + certificate.Unit);
             Console.WriteLine("ValidFrom: " + certificate.ValidFrom);
             Console.WriteLine("ValidTo: " + certificate.ValidTo);
+
             //if (Console.ReadLine() != "y")
             //    return false;
             return true;
@@ -320,10 +363,11 @@ namespace Client
 
         public override void onAddProtection(Protection protection)
         {
-            protection.AddProtection(new QuickLzProtection());
+            //protection.AddProtection(new QuickLzProtection());
+            //protection.AddProtection(new CacheProtection(new SimpleCache(Connection.MAX_PAYLOAD)));
         }
 
-        public override uint HeaderTrashCount
+        public override uint HeaderJunkCount
         {
             get { return 5; }
         }
@@ -331,11 +375,6 @@ namespace Client
         public override uint PrivateKeyOffset
         {
             get { return 45634232; }
-        }
-
-        public override bool onAuthentication(string Username, string Password)
-        {
-            return true;
         }
 
         public override void onAuthenticated()
@@ -351,6 +390,17 @@ namespace Client
         public override void onShareClasses()
         {
 
+        }
+
+        public override bool onPeerConnectionRequest(RootPeer peer)
+        {
+            Console.WriteLine("Allowed connect permission for peer " + peer.VirtualIP);
+            return true;
+        }
+
+        public override RootPeer onGetNewPeerObject()
+        {
+            return new Peer();
         }
     }
 }

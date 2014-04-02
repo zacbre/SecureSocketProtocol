@@ -21,6 +21,7 @@ namespace SecureSocketProtocol2
     public delegate bool ReceiveCallback(IMessage message);
     public delegate SyncObject ReceiveDeletegate(ReceiveCallback message);
     public delegate SSPClient[] GetClientsDelegate();
+    internal delegate bool AuthenticationDelegate(SSPClient client, string Username, string Password);
 
     public enum PeerSide
     {
@@ -102,6 +103,7 @@ namespace SecureSocketProtocol2
         LiteCode = 13,
         LiteCodeResponse = 14,
         LiteCode_Delegates = 15,
+        RootSocket_Payload = 16,
     }
 
     public enum DisconnectReason
@@ -211,5 +213,21 @@ namespace SecureSocketProtocol2
         UserLand,
         /// <summary> This is a SSP error which should get fixed </summary>
         Core
+    }
+
+    public enum DnsErrorCode
+    {
+        DnsAlreadyRegistered = 0,
+        PermissionDenied = 1,
+        Success = 2,
+        DomainNameIsTooLong = 3,
+    }
+
+    public enum PeerErrorCode
+    {
+        Success = 0,
+        PermissionDenied = 1,
+        TimeOut = 2,
+        PeerNotFound = 3,
     }
 }

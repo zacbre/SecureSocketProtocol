@@ -73,16 +73,27 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.LiteCode
                             }
                         }
 
-                        SharedClass sClass = new SharedClass(localSharedClass.BaseClassType, Client, localSharedClass.RemoteInitialize, localSharedClass.BaseClassTypeArgs);
-                        sClass.InitializedClass = Activator.CreateInstance(sClass.BaseClassType, localSharedClass.RemoteInitialize ? ArgObjects : sClass.BaseClassTypeArgs);
-                        Random rnd = new Random(DateTime.Now.Millisecond);
-                        int RandomId = rnd.Next();
-                        while (Client.Connection.InitializedClasses.ContainsKey(RandomId))
-                            RandomId = rnd.Next();
+                        if (localSharedClass.SharedInitializeCounter >= localSharedClass.MaxInitializations)
+                        {
+                            result.ExceptionOccured = true;
+                            result.exceptionMessage = "Reached maximum initializations";
+                        }
+                        else
+                        {
+                            SharedClass sClass = new SharedClass(ClassName, localSharedClass.BaseClassType, Client, localSharedClass.RemoteInitialize, localSharedClass.MaxInitializations, localSharedClass.BaseClassTypeArgs);
+                            sClass.InitializedClass = Activator.CreateInstance(sClass.BaseClassType, localSharedClass.RemoteInitialize ? ArgObjects : sClass.BaseClassTypeArgs);
 
-                        sClass.SharedId = RandomId;
-                        Client.Connection.InitializedClasses.Add(RandomId, sClass);
-                        result.ReturnValue = sClass;
+                            Random rnd = new Random(DateTime.Now.Millisecond);
+                            int RandomId = rnd.Next();
+                            while (Client.Connection.InitializedClasses.ContainsKey(RandomId))
+                                RandomId = rnd.Next();
+
+                            sClass.SharedId = RandomId;
+                            Client.Connection.InitializedClasses.Add(RandomId, sClass);
+                            result.ReturnValue = sClass;
+
+                            localSharedClass.SharedInitializeCounter++;
+                        }
                     }
                 }
                 catch (Exception ex)

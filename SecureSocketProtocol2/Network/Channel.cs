@@ -1,6 +1,5 @@
 ﻿using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -53,8 +52,8 @@ namespace SecureSocketProtocol2.Network
                         if (this.State == ConnectionState.Closed)
                             return;
 
-                        this.State = ConnectionState.Closed;
-                        Connection.SendMessage(new MsgCloseChannel(this), PacketId.CloseChannel);
+
+                        Client.SharedChannel.CloseChannel(ConnectionId);
                         Client.channels.Remove(this.ConnectionId);
                         onChannelClosed();
                     }

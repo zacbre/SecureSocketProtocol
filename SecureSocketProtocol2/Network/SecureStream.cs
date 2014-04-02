@@ -18,6 +18,8 @@ namespace SecureSocketProtocol2.Network
         internal SyncObject ReadLock { get; set; }
         internal object FlushLock { get; private set; }
         private bool _isClosed = false;
+        public bool IsOpen { get; private set; }
+
 
         public SecureStream(IClient client, decimal StreamId)
             : base()
@@ -27,6 +29,8 @@ namespace SecureSocketProtocol2.Network
             this.Client = client;
             this.StreamId = StreamId;
             this.IsOpen = true;
+            this.StreamLock = new SyncObject(client);
+            this.ReadLock = new SyncObject(client);
         }
 
         public SecureStream(IClient client)
@@ -141,14 +145,15 @@ namespace SecureSocketProtocol2.Network
             get { throw new NotSupportedException(); }
             set { throw new NotSupportedException(); }
         }
-
-        public bool IsOpen { get; private set; }
         
         /// <summary> Automatically flushes at Write and sends data to the remote host </summary>
         public bool AutoFlush { get; set; }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            if (IsClosed)
+                return -1;
+
             while (stream.Length == 0)
             {
                 ReadLock.Wait<object>(null, (uint)this.ReadTimeout);
@@ -203,6 +208,11 @@ namespace SecureSocketProtocol2.Network
                     Flush();
                 }
             }
+        }
+
+        public long Available
+        {
+            get { return this.stream.Length; }
         }
 
         public override void Close()

@@ -46,22 +46,46 @@ namespace SecureSocketProtocol2.Network
 
         internal unsafe void SendPayload(NetworkPayloadWriter npw, uint MessageId, PacketId packetId, IPlugin plugin = null, Channel channel = null)
         {
+            SendPayload(npw, MessageId, packetId, true, plugin, channel);
+        }
+
+        /// <summary>
+        /// Send the data to the target connection
+        /// </summary>
+        /// <param name="npw"></param>
+        /// <param name="MessageId"></param>
+        /// <param name="packetId"></param>
+        /// <param name="ApplyProtection">Only set this to false when it's being redirected to a Peer when encryption is still applied</param>
+        /// <param name="plugin"></param>
+        /// <param name="channel"></param>
+        internal unsafe void SendPayload(NetworkPayloadWriter npw, uint MessageId, PacketId packetId,
+                                         bool ApplyProtection, IPlugin plugin = null, Channel channel = null, uint VirtualIp = 0)
+        {
             lock (ClientSendLock)
             {
+                while (Client.State == ConnectionState.Reconnecting)
+                    Thread.Sleep(100); //wait till we are re connected
+                if (Client.State != ConnectionState.Open)
+                    return;
+
                 PacketHeader header = new PacketHeader(this);
                 uint offset = (uint)HEADER_SIZE;
                 uint PayloadLength = (uint)npw.PayloadSize;
                 byte[] payload = npw.GetBuffer();
 
-                //apply the encryption(s), compression(s) and cache
-                /*if(plugin != null)
-                    plugin.protection.ApplyProtection(npw.GetBuffer(), offset, ref length, ref header);
-                else*/
-                payload = protection.ApplyProtection(payload, ref offset, ref PayloadLength, ref header);
+                if (ApplyProtection)
+                {
+                    //apply the encryption(s), compression(s) and cache
+                    /*if(plugin != null)
+                        plugin.protection.ApplyProtection(npw.GetBuffer(), offset, ref length, ref header);
+                    else*/
+                    payload = protection.ApplyProtection(payload, ref offset, ref PayloadLength, ref header);
+                }
 
                 header.PacketSize = (int)PayloadLength;
                 header.PacketID = packetId;
                 header.ChannelId = channel != null ? channel.ConnectionId : 0;
+                header.PeerId = VirtualIp;
 
                 if (packetId == PacketId.PluginPacket)
                 {
@@ -76,13 +100,18 @@ namespace SecureSocketProtocol2.Network
                 CurPacketId++;
                 header.MessageId = MessageId;
                 npw.vStream.Position = 0;
-                header.WriteHeader(payload, (int)offset, (int)PayloadLength, npw);
 
+                try
+                {
+                    header.WriteHeader(payload, (int)offset, (int)PayloadLength, npw);
+                }
+                catch { }
                 //let's not re-write to NPW when nothing has modified
-                if (protection.LayerCount > 0)
+                if (protection.LayerCount > 0 && ApplyProtection)
                 {
                     npw.WriteBytes(payload, (int)offset, (int)PayloadLength);
                 }
+
                 //encrypt the header
                 /*wopEncryption.Encrypt(temp, 0, HEADER_SIZE);
                 if (this.EncryptionType == EncryptionType.Wop)

@@ -52,7 +52,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                         //todo: check password if it only contains the character it should have
                         try
                         {
-                            bool success = Client.onAuthentication(msgAuth.Username, msgAuth.Password);
+                            bool success = Client.Server.onAuthentication(base.Client, msgAuth.Username, msgAuth.Password);
                             base.SendMessage(new MsgAuthenticationSuccess(success));
                         }
                         catch

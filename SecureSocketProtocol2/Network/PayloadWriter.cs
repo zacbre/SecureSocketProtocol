@@ -13,6 +13,10 @@ namespace SecureSocketProtocol2.Network
         {
             vStream = new MemoryStream();
         }
+        public PayloadWriter(MemoryStream stream)
+        {
+            vStream = stream;
+        }
 
         public void WriteBytes(byte[] value)
         {

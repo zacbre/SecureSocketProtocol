@@ -21,10 +21,13 @@ using SecureSocketProtocol2.Network.Messages.UDP;
 using SecureSocketProtocol2.Network.Messages.TCP;
 using SecureSocketProtocol2.Network.Handshake;
 using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using SecureSocketProtocol2.Shared;
 using SecureSocketProtocol2.Network.Messages.TCP.LiteCode;
 using SecureSocketProtocol2.Interfaces;
+using System.Reflection;
+using SecureSocketProtocol2.Interfaces.Shared;
+using SecureSocketProtocol2.Network.RootSocket;
+using System.Text.RegularExpressions;
 
 namespace SecureSocketProtocol2
 {
@@ -40,13 +43,14 @@ namespace SecureSocketProtocol2
         public abstract void onShareClasses();
         public abstract bool onVerifyCertificate(CertInfo certificate);
         public abstract void onAddProtection(Protection protection);
-        public abstract bool onAuthentication(string Username, string Password);
         public abstract void onAuthenticated();
         public abstract void onNewStreamOpen(SecureStream stream);
+        public abstract bool onPeerConnectionRequest(RootPeer peer);
+        public abstract RootPeer onGetNewPeerObject();
 
         //security goes here
-        /// <summary> This will add trash at the end of the header, faking the data and making it more difficult. The server and client must have it set to the same count </summary>
-        public abstract uint HeaderTrashCount { get; }
+        /// <summary> This will add junk at the end of the header, faking the data and making it more difficult. The server and client must have it set to the same count </summary>
+        public abstract uint HeaderJunkCount { get; }
         /// <summary>
         /// Choose a number between 0-65000 taking a high number is good, this option is for setting the key randomly between random data to confuse the attacker,
         /// This is a high security risk for taking a low number or exposing the number you've chosen, this number must also match at the client side
@@ -54,36 +58,22 @@ namespace SecureSocketProtocol2
         public abstract uint PrivateKeyOffset { get; }
 
         /// <summary>
-        /// This method is only for the server-side,
         /// The plugins you would like the server to use and the client must also have these plugins in order to let him be connected,
         /// This method should only be called once.
         /// </summary>
         /// <returns>All the plugins the server should use</returns>
         public abstract IPlugin[] onGetPlugins();
 
-        public Connection Connection { get; set; }
-        public Socket Handle { get; internal set; }
-        internal Socket UdpHandle { get; set; }
-        internal IPEndPoint UdpEndPoint;
-        internal bool UdpHandshaked = false;
-        internal byte[] UdpHandshakeCode;
-        internal bool ServerSided { get; set; }
+        public SSPServer Server { get; internal set; }
 
-        public System.Timers.Timer KeepAliveTimer { get; private set; }
-        internal SortedList<ulong, Channel> channels;
-        internal SyncObject ChannelSyncObject;
-        internal Type baseChannel;
-        internal object[] baseChannelArgs;
+        public Connection Connection { get; set; }
         public bool isUsingProxy { get; private set; }
         public string RemoteIp { get; internal set; }
-        public decimal ClientId { get; internal set; }
+        public decimal ClientId { get { return Connection.ClientId; } }
         public bool ReconnectAtDisconnect { get; set; }
         public bool ServerAllowsReconnecting { get; internal set; }
-        internal bool CompletedHandshake { get; private set; }
         public CertInfo Certificate { get; internal set; }
-        internal bool UseUDP { get; set; } //it's being used in the HandShake
-        public bool Handshaked { get; internal set; }
-
+        public bool Handshaked { get { return Connection.Handshaked; } }
         public ulong TotalBytesIn { get { return Connection.BytesIn; } }
         public ulong TotalBytesOut { get { return Connection.BytesOut; } }
 
@@ -103,13 +93,7 @@ namespace SecureSocketProtocol2
                 this._timeSync = value;
             }
         }
-        internal DateTime _timeSync;
-        internal Stopwatch TimeSyncSW; //used for updating the TimeSync
-
-        /// <summary> This object is only being used client-sided </summary>
-        private SocketAsyncEventArgs UdpAsyncReceiveEvent;
-        internal SyncObject UdpSyncObject;
-
+        
         /// <summary>
         /// Shows to which side he belongs, Running at the Server or is it a Client
         /// </summary>
@@ -119,30 +103,11 @@ namespace SecureSocketProtocol2
         /// A random seed that was provied by the server
         /// </summary>
         public uint Seed { get { return Connection.messageHandler.Seed; } }
-
-        /// <summary>
-        /// The Token is being used as security ID to identify the client
-        /// </summary>
-        internal decimal Token { get; set; }
-        internal bool ConnectionClosedNormal = false;
-        internal ClientProperties Properties;
-
-
-        public PluginSystem Plugins
-        {
-            get
-            {
-                return Connection.pluginSystem;
-            }
-        }
-
         public uint ReconnectionCount { get; internal set; }
 
         /// <summary> The object that carries along with the SSPClient </summary>
         public object Tag { get; set; }
-
-        [DefaultValue(ConnectionState.Closed)]
-        public ConnectionState State { get; internal set; }
+        public ConnectionState State { get { return Connection.State; } }
 
         public DeepPacketInspection DPI
         {
@@ -150,34 +115,20 @@ namespace SecureSocketProtocol2
         }
         public bool Connected
         {
-            get
-            {
-                return Connection.Connected;
-            }
-            private set
-            {
-                Connection.Connected = value;
-            }
+            get { return Connection.Connected; }
         }
         public bool MultiThreadProcessing
         {
             get;
             set;
         }
-
         public string HostIp
         {
-            get
-            {
-                return ((IPEndPoint)Handle.RemoteEndPoint).Address.ToString();
-            }
+            get { return ((IPEndPoint)Handle.RemoteEndPoint).Address.ToString(); }
         }
         public string HostPort
         {
-            get
-            {
-                return ((IPEndPoint)Handle.RemoteEndPoint).Port.ToString();
-            }
+            get { return ((IPEndPoint)Handle.RemoteEndPoint).Port.ToString(); }
         }
 
         /// <summary>
@@ -188,6 +139,72 @@ namespace SecureSocketProtocol2
             get { return Connection.messageHandler; }
         }
 
+        public bool ChannelsAllowed { get; internal set; }
+        public bool PeersAllowed { get; internal set; }
+
+        internal Socket Handle { get; set; }
+        internal Socket UdpHandle { get; set; }
+        internal IPEndPoint UdpEndPoint;
+        internal bool UdpHandshaked = false;
+        internal byte[] UdpHandshakeCode;
+        internal bool ServerSided { get { return PeerSide == PeerSide.Server; } }
+
+        internal System.Timers.Timer KeepAliveTimer { get; private set; }
+        internal SortedList<ulong, Channel> channels;
+        internal Type baseChannel;
+        internal object[] baseChannelArgs;
+        internal bool CompletedHandshake { get; private set; }
+        internal bool UseUDP { get; set; } //it's being used in the HandShake
+        internal DateTime _timeSync;
+        internal Stopwatch TimeSyncSW; //used for updating the TimeSync
+
+        /// <summary> This object is only being used client-sided </summary>
+        private SocketAsyncEventArgs UdpAsyncReceiveEvent;
+        internal SyncObject UdpSyncObject;
+
+        /// <summary>
+        /// The Token is being used as security ID to identify the client
+        /// </summary>
+        internal decimal Token { get; set; }
+        internal bool ConnectionClosedNormal = false;
+        internal ClientProperties Properties;
+
+        public PluginSystem Plugins
+        {
+            get
+            {
+                return Connection.pluginSystem;
+            }
+        }
+
+        //RootSocket Information
+        internal SortedList<decimal, RootPeer> PeerConnections { get; private set; }
+
+        private string _virtualIP;
+        internal uint VirtualIpInt { get; private set; }
+        public string VirtualIP
+        {
+            get { return _virtualIP; }
+            internal set
+            {
+                if (!Regex.IsMatch(value, RootPeer.IpValidationString))
+                    throw new Exception("Not a valid virtual ip address");
+                _virtualIP = value;
+
+                string[] tempStr = value.Split('.');
+                byte[] temp = new byte[4];
+
+                for (int i = 0; i < temp.Length; i++)
+                    temp[i] = byte.Parse(tempStr[i]);
+                VirtualIpInt = BitConverter.ToUInt32(temp, 0);
+            }
+        }
+
+        //shared classes
+        internal ISharedChannel SharedChannel;
+        internal ISharedRoot SharedRoot;
+        internal ISharedClientRoot SharedClientRoot;
+
         /// <summary>
         /// Initialize the client at the server side
         /// </summary>
@@ -197,6 +214,7 @@ namespace SecureSocketProtocol2
         public SSPClient(Type BaseChannel, object[] BaseChannelArgs, bool AllowReconnect = true)
         {
             this.channels = new SortedList<ulong, Channel>();
+            this.PeerConnections = new SortedList<decimal, RootPeer>();
             this.ReconnectAtDisconnect = AllowReconnect;
             this.baseChannel = BaseChannel;
             this.baseChannelArgs = BaseChannelArgs;
@@ -215,14 +233,13 @@ namespace SecureSocketProtocol2
         /// <param name="Password">If authenication is being used fill it in or else keep it empty, the server will response "Username or Password is wrong" if username/password is wrong or you filledin a username/password even though the server does not expects it</param>
         /// <param name="proxySettings">If you want to use a proxy</param>
         /// <param name="ConnectingTimeout">Set the connecting timeout in milliseconds</param>
-        public SSPClient(string HostIp, ushort Port, Type BaseChannel, object[] BaseChannelArgs, byte[] PrivateKey, Stream[] KeyFiles = null, string Username = "", string Password = "",
-                         ProxySettings proxySettings = null, int ConnectingTimeout = 30000)
-            : this(BaseChannel, BaseChannelArgs)
+        public SSPClient(ClientProperties Properties)
+            : this(Properties.BaseChannel, Properties.BaseChannelArgs)
         {
-            if (PrivateKey == null || (PrivateKey != null && PrivateKey.Length <= 16))
+            if (Properties.PrivateKey == null || (Properties.PrivateKey != null && Properties.PrivateKey.Length <= 16))
                 throw new ArgumentException("The private key must be longer then 16 in length", "PrivateKey");
 
-            this.Properties = new ClientProperties(HostIp, Port, BaseChannel, BaseChannelArgs, PrivateKey, KeyFiles, proxySettings, ConnectingTimeout, Username, Password);
+            this.Properties = Properties;
             Connect(ConnectionState.Open);
         }
 
@@ -293,8 +310,7 @@ namespace SecureSocketProtocol2
             }
 
             this.Connection = new Connection(this);
-            this.Connected = true;
-            
+            this.Connection.State = ConnectionState.Open;
             decimal oldClientId = this.ClientId;
             decimal oldToken = this.Token;
 
@@ -310,7 +326,6 @@ namespace SecureSocketProtocol2
 
             }
 
-            this.State = ConnectionState.Open;
 
             try
             {
@@ -322,6 +337,9 @@ namespace SecureSocketProtocol2
             }
 
             StartReceiver();
+
+            SharedChannel = GetSharedClass<ISharedChannel>("LITECODE_CHANNEL");
+            SharedRoot = GetSharedClass<ISharedRoot>("SHARED_ROOT");
 
             if (State != ConnectionState.Reconnecting)
             {
@@ -336,21 +354,19 @@ namespace SecureSocketProtocol2
             }
         }
 
-
-
-
         /// <summary> Share a class with other clients to use for remote code execution </summary>
         /// <param name="ClassType">The Class object to share with others</param>
         /// <param name="RemoteInitialize">False: The class will be initialized locally using the "ClassArgs" objects,
         ///                                True: The remote client will give the ClassArgs to use for initializing the object and will ignore the local argument objects</param>
         /// <param name="ClassArgs">The objects to initialize the class with</param>
-        public void ShareClass(Type ClassType, bool RemoteInitialize = false, params object[] ClassArgs)
+        /// <param name="MaxInitializations">The maximum count that the class can be shared </param>
+        public void ShareClass(Type ClassType, bool RemoteInitialize = false, int MaxInitializations = 100, params object[] ClassArgs)
         {
             lock (Connection.SharedClasses)
             {
                 if (Connection.SharedClasses.ContainsKey(ClassType.Name))
                     throw new Exception("A class with this name is already shared");
-                Connection.SharedClasses.Add(ClassType.Name, new SharedClass(ClassType, this, RemoteInitialize, ClassArgs));
+                Connection.SharedClasses.Add(ClassType.Name, new SharedClass(ClassType.Name, ClassType, this, RemoteInitialize, MaxInitializations, ClassArgs));
             }
         }
 
@@ -360,7 +376,8 @@ namespace SecureSocketProtocol2
         /// <param name="RemoteInitialize">False: The class will be initialized locally using the "ClassArgs" objects,
         ///                                True: The remote client will give the ClassArgs to use for initializing the object and will ignore the local argument objects</param>
         /// <param name="ClassArgs">The objects to initialize the class with</param>
-        public void ShareClass(string Name, Type ClassType, bool RemoteInitialize = false, params object[] ClassArgs)
+        /// <param name="MaxInitializations">The maximum count that the class can be shared </param>
+        public void ShareClass(string Name, Type ClassType, bool RemoteInitialize = false, int MaxInitializations = 100, params object[] ClassArgs)
         {
             lock (Connection.SharedClasses)
             {
@@ -368,7 +385,7 @@ namespace SecureSocketProtocol2
                     throw new ArgumentNullException("Name");
                 if (Connection.SharedClasses.ContainsKey(Name))
                     throw new Exception("A class with this name is already shared");
-                Connection.SharedClasses.Add(Name, new SharedClass(ClassType, this, RemoteInitialize, ClassArgs));
+                Connection.SharedClasses.Add(Name, new SharedClass(Name, ClassType, this, RemoteInitialize, MaxInitializations, ClassArgs));
             }
         }
 
@@ -403,6 +420,89 @@ namespace SecureSocketProtocol2
                 Connection.InitializedClasses.Add(c.SharedId, c);
             }
             return tmp;
+        }
+
+        public void DisposeSharedClass(object SharedClass)
+        {
+            lock (Connection.InitializedClasses)
+            {
+                if (SharedClass == null)
+                    throw new ArgumentNullException("SharedClass");
+
+                Type type = SharedClass.GetType();
+                FieldInfo[] inf = type.GetFields();
+
+                if (inf.Length == 0)
+                    throw new Exception("Invalid Shared Class");
+
+                SharedClass shared = inf[0].GetValue(SharedClass) as SharedClass;
+
+                if (shared == null)
+                    throw new Exception("Invalid Shared Class");
+
+                if (shared.IsDisposed)
+                    return;
+
+                if (Connection.InitializedClasses.ContainsKey(shared.SharedId))
+                {
+                    Connection.InitializedClasses[shared.SharedId].IsDisposed = true;
+                    Connection.InitializedClasses[shared.SharedId].InitializedClass = null;
+                    Connection.InitializedClasses.Remove(shared.SharedId);
+                }
+                Connection.SendMessage(new MsgDisposeClass(shared.SharedId), PacketId.LiteCode);
+            }
+        }
+
+        /// <summary>
+        /// Register this client in the Dns Records so it's easier to find when using Peer-To-Peer
+        /// </summary>
+        /// <param name="DnsName">The name to use</param>
+        /// <returns>The error code</returns>
+        public DnsErrorCode RegisterDns(string DnsName)
+        {
+            return SharedRoot.RegisterDns(DnsName);
+        }
+
+        /// <summary>
+        /// Resolve the DNS Record to get the Virtual IP of a peer
+        /// </summary>
+        /// <param name="DnsName">The name of the DNS</param>
+        /// <returns>The Virtual IP, if empty the record could not be found</returns>
+        public string ResolveDns(string DnsName)
+        {
+            return SharedRoot.ResolveDns(DnsName);
+        }
+
+        /// <summary>
+        /// Connect to a peer
+        /// </summary>
+        /// <param name="VirtualIpOrDns"></param>
+        /// <param name="peer"></param>
+        /// <returns></returns>
+        public PeerErrorCode ConnectToPeer(string VirtualIpOrDns, RootPeer peer)
+        {
+            if (peer.Connected)
+                throw new Exception("Peer is already connected");
+
+            PeerResponse response = SharedRoot.ConnectToPeer(VirtualIpOrDns);
+            if (response.ErrorCode == PeerErrorCode.Success)
+            {
+                peer.Connected = true; //temp
+                peer.VirtualIP = response.VirtualIP;
+                peer.ConnectionId = response.ConnectionId;
+                peer._client = this;
+                peer.FromClient = this;
+
+                if (!PeerConnections.ContainsKey(response.ConnectionId))
+                    PeerConnections.Add(response.ConnectionId, peer);
+                else
+                    PeerConnections[response.ConnectionId] = peer;
+
+                peer.onRegisterMessages(this.MessageHandler);
+                peer.onClientConnect();
+                return PeerErrorCode.Success;
+            }
+            return response.ErrorCode;
         }
 
         internal SSPError SendUdpMessage(IMessage message, UdpPAcketId packetId)
@@ -570,17 +670,23 @@ namespace SecureSocketProtocol2
                     channel.Connection = Connection;
                     channel.Client = this;
                     channel.State = ConnectionState.Open;
+                    OpenChannelResponse ChannelResponse = null;
 
-                    this.ChannelSyncObject = new SyncObject(Connection);
-                    this.Connection.SendMessage(new MsgOpenChannel(), PacketId.OpenChannel);
-                    MsgOpenChannelResponse response = this.ChannelSyncObject.Wait<MsgOpenChannelResponse>(default(MsgOpenChannelResponse), 30000);
+                    SyncObject syncObject = new SyncObject(Connection);
+                    SharedChannel.OpenChannel((OpenChannelResponse response) =>
+                    {
+                        ChannelResponse = response;
+                        syncObject.Pulse();
+                    });
 
-                    if(response == null)
+                    syncObject.Wait<object>(null, 30000);
+
+                    if (ChannelResponse == null)
                         return ChannelError.Timeout;
-                    if(!response.success)
+                    if (!ChannelResponse.success)
                         return ChannelError.Timeout;
 
-                    channel.ConnectionId = response.ConnectionId;
+                    channel.ConnectionId = ChannelResponse.ConnectionId;
                     channels.Add(channel.ConnectionId, channel);
 
                     try
@@ -645,7 +751,6 @@ namespace SecureSocketProtocol2
                         {
                             return;
                         }
-
 
                         //process packet
                         if (UdpHandshaked)
@@ -754,8 +859,7 @@ namespace SecureSocketProtocol2
                 onException(ex, ErrorType.Core);
             }
 
-            this.State = ConnectionState.Closed;
-            this.Connected = false;
+            this.Connection.State = ConnectionState.Closed;
 
             try
             {

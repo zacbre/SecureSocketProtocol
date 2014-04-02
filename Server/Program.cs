@@ -8,7 +8,7 @@ using System.Text;
 
 namespace Server
 {
-    class Program : SSPServer<Client>
+    class Program : SSPServer
     {
         public static Program prog;
 
@@ -26,12 +26,12 @@ namespace Server
             Process.GetCurrentProcess().WaitForExit();
         }
 
-        public override void onConnectionAccept(Client client)
+        public override void onConnectionAccept(SSPClient client)
         {
             Console.WriteLine("Accepted client");
         }
 
-        public override void onConnectionClosed(Client client)
+        public override void onConnectionClosed(SSPClient client)
         {
 
         }
@@ -39,6 +39,26 @@ namespace Server
         public override void onException(Exception ex)
         {
             Console.WriteLine("Error occured: " + ex.StackTrace);
+        }
+
+        public override bool onAuthentication(SSPClient client, string Username, string Password)
+        {
+            Console.WriteLine("Authenication, Username:" + Username + ", Password:" + Password);
+
+            if (Username == "Dergan" && Password == "1AF77DC7E7DDAB416977FA0CACE6840FBA7CA9D8FC580933DB74A8B58BED60F71B4E7FE85414E269E426E8C75A907EFB4021F2248FB9BEA5")
+                return true;
+
+            return false;
+        }
+
+        public override bool onPeerConnectionRequest(SSPClient FromClient, SSPClient ToClient)
+        {
+            Console.WriteLine("Permission granted for connecting from " + FromClient.VirtualIP + " to " + ToClient.VirtualIP);
+            return true;
+        }
+        public override bool onPeerCreateDnsRequest(string DnsName, SSPClient Requestor)
+        {
+            return true;
         }
     }
 
@@ -50,9 +70,8 @@ namespace Server
 
         }
 
-        public override ushort ListenPort { get { return 539; } }
+        public override ushort ListenPort { get { return 444; } }
         public override string ListenIp { get { return "0.0.0.0"; } }
-        public override object[] BaseClientArguments { get { return new object[0]; } }
         public override bool AllowUdp { get { return true; } }
         public override bool UserPassAuthenication { get { return true; } }
 
@@ -75,6 +94,11 @@ namespace Server
         public override bool GenerateKeysInBackground
         {
             get { return false; }
+        }
+
+        public override SSPClient GetNewClient()
+        {
+            return new Client();
         }
     }
 

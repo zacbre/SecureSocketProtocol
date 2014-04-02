@@ -8,31 +8,30 @@ namespace SecureSocketProtocol2.Network
 {
     public class PayloadReader : IDisposable
     {
-        private byte[] _Packet;
-        private int _Offset;
+        private MemoryStream stream;
         public PayloadReader(byte[] packet)
         {
-            _Packet = packet;
-            _Offset = 0;
+            this.stream = new MemoryStream(packet, 0, packet.Length, false, true);
+        }
+        public PayloadReader(MemoryStream stream)
+        {
+            stream.GetBuffer(); //test the stream if the buffer is public
+            this.stream = stream;
         }
 
         public int Offset
         {
-            get { return _Offset; }
-            set { _Offset = value; }
+            get { return (int)stream.Position; }
+            set { stream.Position = (int)value; }
         }
 
         public int ReadInteger()
         {
-            int result = BitConverter.ToInt32(_Packet, _Offset);
-            _Offset += 4;
-            return result;
+            return BitConverter.ToInt32(ReadBytes(4), 0);
         }
         public float ReadFloat()
         {
-            float result = BitConverter.ToSingle(_Packet, _Offset);
-            _Offset += 4;
-            return result;
+            return BitConverter.ToSingle(ReadBytes(4), 0);
         }
 
         /// <summary>
@@ -45,16 +44,12 @@ namespace SecureSocketProtocol2.Network
 
         public uint ReadUInteger()
         {
-            uint result = BitConverter.ToUInt32(_Packet, _Offset);
-            _Offset += 4;
-            return result;
+            return BitConverter.ToUInt32(ReadBytes(4), 0);
         }
 
         public byte ReadByte()
         {
-            byte result = _Packet[_Offset];
-            _Offset += 1;
-            return result;
+            return ReadBytes(1)[0];
         }
 
         public bool ReadBool()
@@ -65,54 +60,39 @@ namespace SecureSocketProtocol2.Network
         public byte[] ReadBytes(int Length)
         {
             byte[] result = new byte[Length];
-            Array.Copy(_Packet, _Offset, result, 0, Length);
-            _Offset += Length;
+            stream.Read(result, 0, result.Length);
             return result;
         }
 
         public short ReadShort()
         {
-            short result = BitConverter.ToInt16(_Packet, _Offset);
-            _Offset += 2;
-            return result;
+            return BitConverter.ToInt16(ReadBytes(2), 0);
         }
         public ushort ReadUShort()
         {
-            ushort result = BitConverter.ToUInt16(_Packet, _Offset);
-            _Offset += 2;
-            return result;
+            return BitConverter.ToUInt16(ReadBytes(2), 0);
         }
 
         public double ReadDouble()
         {
-            double result = BitConverter.ToDouble(_Packet, _Offset);
-            _Offset += 8;
-            return result;
+            return BitConverter.ToDouble(ReadBytes(8), 0);
         }
 
         public long ReadLong()
         {
-            long result = BitConverter.ToInt64(_Packet, _Offset);
-            _Offset += 8;
-            return result;
+            return BitConverter.ToInt64(ReadBytes(8), 0);
         }
 
         public ulong ReadULong()
         {
-            ulong result = BitConverter.ToUInt64(_Packet, _Offset);
-            _Offset += 8;
-            return result;
+            return BitConverter.ToUInt64(ReadBytes(8), 0);
         }
 
         public decimal ReadDecimal()
         {
-            using (MemoryStream stream = new MemoryStream(_Packet, _Offset,  16))
+            using (BinaryReader reader = new BinaryReader(new MemoryStream(ReadBytes(16))))
             {
-                using (BinaryReader reader = new BinaryReader(stream))
-                {
-                    _Offset += 16;
-                    return reader.ReadDecimal();
-                }
+                return reader.ReadDecimal();
             }
         }
 
@@ -121,11 +101,11 @@ namespace SecureSocketProtocol2.Network
             string result = "";
             try
             {
-                result = System.Text.Encoding.Unicode.GetString(_Packet, _Offset, _Packet.Length - _Offset);
+                result = System.Text.Encoding.Unicode.GetString(Buffer, Offset, (int)stream.Length - Offset);
                 int idx = result.IndexOf((char)0x00);
                 if (!(idx == -1))
                     result = result.Substring(0, idx);
-                _Offset += (result.Length * 2) + 2;
+                Offset += (result.Length * 2) + 2;
             }
             catch (Exception ex)
             {
@@ -151,15 +131,19 @@ namespace SecureSocketProtocol2.Network
             return new BigInteger(ReadBytes(length));
         }
 
-        public byte[] Packet
+        public int Length
         {
-            get { return _Packet; }
+            get { return (int)stream.Length; }
+        }
+
+        public byte[] Buffer
+        {
+            get { return this.stream.GetBuffer(); }
         }
 
         public void Dispose()
         {
-            _Packet = null;
-            _Offset = -1;
+            stream.Dispose();
         }
     }
 }

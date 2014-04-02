@@ -6,7 +6,6 @@ using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using SecureSocketProtocol2.Network.Messages.TCP.StreamMessages;
 using SecureSocketProtocol2.Network.Protections;
 using SecureSocketProtocol2.Network.Protections.Cache;
@@ -47,7 +46,7 @@ namespace SecureSocketProtocol2.Network
         {
             get
             {
-                return (int)(29 + protection.LayerCount + Client.HeaderTrashCount);
+                return (int)(33 + Client.HeaderJunkCount);
             }
         }
 
@@ -82,30 +81,31 @@ namespace SecureSocketProtocol2.Network
             get { return Client.Handle; }
         }
 
-        public bool Connected { get; internal set; }
+        public ConnectionState State { get; internal set; }
+        public bool Connected { get { return State == ConnectionState.Open; } }
+        public decimal ClientId { get; internal set; }
+        public bool Handshaked { get; internal set; }
 
         public Connection(SSPClient client)
         {
             this.Client = client;
-            this.Connected = true;
-            this.DPI = new DeepPacketInspection(this);
+            this.State = ConnectionState.Open;
+            this.DPI = new DeepPacketInspection();
             this.Client.Handle.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
             this.Client.Handle.NoDelay = true;
 
             this.packetQueue = new PacketQueue(this);
             this.ChannelPayloadQueue = new TaskQueue<ChannelRecvInfo>(client, onChannelPayloadQueue, 100);
-            this.CloseChannelQueue = new TaskQueue<IMessage>(client, onCloseChannelQueue, 100);
             this.DisconnectedQueue = new TaskQueue<IMessage>(client, onDisconnectedQueue, 100);
-            this.OpenChannelQueue = new TaskQueue<IMessage>(client, onOpenChannelQueue, 100);
-            this.OpenChannelResponseQueue = new TaskQueue<IMessage>(client, onOpenChannelResponseQueue, 100);
+            this.ResponseQueue = new TaskQueue<IMessage>(client, onResponseQueue, 100);
             this.PacketTaskQueue = new TaskQueue<IMessage>(client, onPacketTaskQueue, 10);
             this.PayloadQueue = new TaskQueue<IMessage>(client, onPayloadQueue, 100);
             this.KeepAliveQueue = new TaskQueue<IMessage>(client, onKeepAliveQueue, 10);
             this.PluginDataQueue = new TaskQueue<PluginRecvInfo>(client, onPluginDataQueue, 100);
             this.StreamQueue = new TaskQueue<IMessage>(client, onStreamQueue, 5); //making it 5 on purpose
             this.LiteCodeQueue = new TaskQueue<IMessage>(client, onLiteCodeQueue, 100);
-            this.LiteCodeResponseQueue = new TaskQueue<IMessage>(client, onLiteCodeResponseQueue, 100);
             this.LiteCodeDelegateQueue = new TaskQueue<IMessage>(client, onLiteCodeDelegateQueue, 100);
+            this.RootSocketQueue = new TaskQueue<IPeerMessage>(client, onRootSocketQueue, 100);
 
             this.messageHandler = new MessageHandler(0);
             this.pluginSystem = new PluginSystem(client);
@@ -115,8 +115,6 @@ namespace SecureSocketProtocol2.Network
             this.SharedClasses = new SortedList<string, SharedClass>();
             this.InitializedClasses = new SortedList<int, SharedClass>();
         }
-
-        
 
         internal void ReConnect()
         {

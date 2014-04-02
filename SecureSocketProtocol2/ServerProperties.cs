@@ -14,8 +14,8 @@ namespace SecureSocketProtocol2
         /// <summary> The local ip used to listen at, default: 0.0.0.0 </summary>
         public abstract string ListenIp { get; }
 
-        /// <summary> The arguments used to initialize the BaseChannel </summary>
-        public abstract object[] BaseClientArguments { get; }
+        /// <summary> Get a new initialized client that can be used for the server </summary>
+        public abstract SSPClient GetNewClient();
 
         /// <summary> Enable/Disable if you also want to use the UDP protocol, when enabled every client must be connected with UDP and TCP </summary>
         public abstract bool AllowUdp { get; }

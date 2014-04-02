@@ -14,12 +14,9 @@ namespace SecureSocketProtocol2.Network
         /// </summary>
         private ushort PacketId = 0;
 
-        private Connection connection;
-
-        public DeepPacketInspection(Connection connection)
+        public DeepPacketInspection()
         {
             this.Rules = new List<DPIRule>();
-            this.connection = connection;
         }
 
         /// <summary>
@@ -52,8 +49,8 @@ namespace SecureSocketProtocol2.Network
                     if (Header != null)
                     {
                         //checking the packet size
-                        //if (Header.PacketSize < 0 || Header.PacketSize >= Connection.MAX_PAYLOAD)
-                        //    return false;
+                        if (Header.PacketSize < 0 || Header.PacketSize >= Connection.MAX_PAYLOAD)
+                            return false;
 
                         //checking if a attacker tried to send a packet
                         if (Header.CurPacketId != PacketId)

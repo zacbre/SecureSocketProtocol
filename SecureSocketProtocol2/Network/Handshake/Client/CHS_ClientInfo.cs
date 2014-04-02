@@ -21,6 +21,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             {
                 return new HandshakeType[]
                 {
+                    HandshakeType.ReceiveMessage,
                     HandshakeType.SendMessage
                 };
             }
@@ -32,6 +33,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
             {
                 return new HandshakeType[]
                 {
+                    HandshakeType.SendMessage,
                     HandshakeType.ReceiveMessage
                 };
             }
@@ -39,6 +41,8 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
 
         public override bool onHandshake()
         {
+            base.SendMessage(new MsgClientSettings(base.Client.Properties.AllowChannels, base.Client.Properties.AllowPeers));
+
             SyncObject syncObject = null;
             if (!(syncObject = base.ReceiveMessage((IMessage message) =>
             {
@@ -46,8 +50,9 @@ namespace SecureSocketProtocol2.Network.Handshake.Client
 
                 if (mci != null)
                 {
-                    Client.ClientId = mci.ClientId;
+                    Client.Connection.ClientId = mci.ClientId;
                     Client.Token = mci.Token;
+                    Client.VirtualIP = mci.VirtualIP;
 
                     if (Client.UseUDP)
                     {

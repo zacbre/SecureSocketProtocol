@@ -43,15 +43,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes\NoWaitMethodAttribute.cs" />
     <Compile Include="Attributes\PacketQueueAttribute.cs" />
     <Compile Include="Attributes\RemoteConstructorAttribute.cs" />
     <Compile Include="Attributes\RemoteExecutionAttribute.cs" />
     <Compile Include="Attributes\UdpMethodAttribute.cs" />
     <Compile Include="Attributes\UncheckedRemoteExecutionAttribute.cs" />
+    <Compile Include="Cache\CacheMethods\BufferedCache.cs" />
+    <Compile Include="Cache\CacheMethods\SimpleCache.cs" />
+    <Compile Include="Cache\ICache.cs" />
     <Compile Include="CertificateInfo.cs" />
     <Compile Include="ClientProperties.cs" />
     <Compile Include="Compressions\CacheStream.cs" />
+    <Compile Include="Compressions\GzipCompression.cs" />
     <Compile Include="Compressions\LZ4\ILZ4Compressor.cs" />
     <Compile Include="Compressions\LZ4\ILZ4Decompressor.cs" />
     <Compile Include="Compressions\LZ4\LZ4.cs" />
@@ -95,6 +98,13 @@
       <DependentUpon>uTorrentProgressBar.cs</DependentUpon>
     </Compile>
     <Compile Include="Encryptions\AesEncryption.cs" />
+    <Compile Include="Encryptions\BlowfishCipher.cs" />
+    <Compile Include="Encryptions\DexCryptManaged.cs" />
+    <Compile Include="Encryptions\HC128.cs" />
+    <Compile Include="Encryptions\PolyAES.cs" />
+    <Compile Include="Encryptions\PolyDex2.cs" />
+    <Compile Include="Encryptions\PolyDexMin3.cs" />
+    <Compile Include="Encryptions\PolyXor.cs" />
     <Compile Include="Encryptions\RSAEncryption.cs" />
     <Compile Include="Encryptions\UnsafeXor.cs" />
     <Compile Include="Encryptions\WopEncryption.cs" />
@@ -111,6 +121,9 @@
     <Compile Include="Hashers\SuperFastHashUInt16Hack.cs" />
     <Compile Include="Hashers\SuperFastHashUnsafe.cs" />
     <Compile Include="Interfaces\Shared\ISecureStream.cs" />
+    <Compile Include="Interfaces\Shared\ISharedChannel.cs" />
+    <Compile Include="Interfaces\Shared\ISharedClientRoot.cs" />
+    <Compile Include="Interfaces\Shared\ISharedRoot.cs" />
     <Compile Include="Misc\AverageValue.cs" />
     <Compile Include="Misc\Benchmark.cs" />
     <Compile Include="Misc\BigInteger.cs" />
@@ -137,6 +150,7 @@
     <Compile Include="Network\Handshake\Client\CHS_KeyExchange.cs" />
     <Compile Include="Network\Handshake\Client\CHS_Plugins.cs" />
     <Compile Include="Network\Handshake\Client\CHS_Seed.cs" />
+    <Compile Include="Network\Handshake\Client\CHS_ShareClasses.cs" />
     <Compile Include="Network\Handshake\Client\CHS_TimeSynchronisation.cs" />
     <Compile Include="Network\Handshake\Client\CHS_UDP.cs" />
     <Compile Include="Network\Handshake\Client\CHS_Validation.cs" />
@@ -147,9 +161,13 @@
     <Compile Include="Network\Handshake\Server\SHS_KeyExchange.cs" />
     <Compile Include="Network\Handshake\Server\SHS_Plugins.cs" />
     <Compile Include="Network\Handshake\Server\SHS_Seed.cs" />
+    <Compile Include="Network\Handshake\Server\SHS_ShareClasses.cs" />
     <Compile Include="Network\Handshake\Server\SHS_TimeSynchronisation.cs" />
     <Compile Include="Network\Handshake\Server\SHS_UDP.cs" />
     <Compile Include="Network\Handshake\Server\SHS_Validation.cs" />
+    <Compile Include="Network\Messages\IPeerMessage.cs" />
+    <Compile Include="Network\Messages\TCP\Handshake\MsgClientSettings.cs" />
+    <Compile Include="Network\Messages\TCP\LiteCode\MsgDisposeClass.cs" />
     <Compile Include="Network\Messages\TCP\LiteCode\MsgExecuteMethod.cs" />
     <Compile Include="Network\Messages\TCP\LiteCode\MsgExecuteMethodResponse.cs" />
     <Compile Include="Network\Messages\TCP\LiteCode\MsgGetSharedClass.cs" />
@@ -159,7 +177,6 @@
     <Compile Include="Network\Messages\TCP\Handshake\MsgAuthentication.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgAuthenticationSuccess.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgClientInfo.cs" />
-    <Compile Include="Network\Messages\TCP\Channels\MsgCloseChannel.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgDiffiehellman.cs" />
     <Compile Include="Network\Messages\TCP\MsgDisconnected.cs" />
     <Compile Include="Network\Messages\TCP\MsgDummy.cs" />
@@ -170,8 +187,6 @@
     <Compile Include="Network\Messages\TCP\Handshake\MsgMessageSeed.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgPluginCount.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgOk.cs" />
-    <Compile Include="Network\Messages\TCP\Channels\MsgOpenChannel.cs" />
-    <Compile Include="Network\Messages\TCP\Channels\MsgOpenChannelResponse.cs" />
     <Compile Include="Network\Messages\TCP\MsgPacketQueue.cs" />
     <Compile Include="Network\Messages\TCP\MsgReconnect.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgRsaPublicKey.cs" />
@@ -180,10 +195,16 @@
     <Compile Include="Network\Messages\TCP\Handshake\MsgTimeSyncResponse.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgUdpValidation.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgValidation.cs" />
+    <Compile Include="Network\Messages\TCP\RootSocket\MsgRootDnsRequest.cs" />
+    <Compile Include="Network\Messages\TCP\RootSocket\MsgRootDnsResponse.cs" />
     <Compile Include="Network\Messages\TCP\StreamMessages\MsgCloseStream.cs" />
     <Compile Include="Network\Messages\TCP\StreamMessages\MsgOpenStream.cs" />
     <Compile Include="Network\Messages\TCP\StreamMessages\MsgOpenStreamResponse.cs" />
     <Compile Include="Network\Messages\TCP\StreamMessages\MsgStreamData.cs" />
+    <Compile Include="Network\RootSocket\RootDnsInfo.cs" />
+    <Compile Include="Network\RootSocket\RootPeer.cs" />
+    <Compile Include="Network\RootSocket\RootDns.cs" />
+    <Compile Include="Network\RootSocket\RootRecvInfo.cs" />
     <Compile Include="Network\SecureStream.cs" />
     <Compile Include="Network\Messages\UDP\MsgUdpHandshake.cs" />
     <Compile Include="Network\NetworkPayload.cs" />
@@ -196,7 +217,7 @@
     <Compile Include="Network\PayloadReader.cs" />
     <Compile Include="Network\PayloadWriter.cs" />
     <Compile Include="Network\PrivateKeyHandler.cs" />
-    <Compile Include="Network\Protections\Cache\SmartCacheProtection.cs" />
+    <Compile Include="Network\Protections\Cache\CacheProtection.cs" />
     <Compile Include="Network\Protections\Compression\GzipProtection.cs" />
     <Compile Include="Network\Protections\Compression\LZ4Protection.cs" />
     <Compile Include="Network\Protections\Compression\LZMAProtection.cs" />
@@ -222,6 +243,9 @@
     <Compile Include="Shared\DynamicClassCreator.cs" />
     <Compile Include="Shared\DynamicDelegateCreator.cs" />
     <Compile Include="Shared\SharedClass.cs" />
+    <Compile Include="Shared\SharedClasses\SharedChannel.cs" />
+    <Compile Include="Shared\SharedClasses\SharedClientRoot.cs" />
+    <Compile Include="Shared\SharedClasses\SharedRoot.cs" />
     <Compile Include="Shared\SharedClasses\SharedStream.cs" />
     <Compile Include="Shared\SharedDelegate.cs" />
     <Compile Include="Shared\SharedDelegateInfo.cs" />

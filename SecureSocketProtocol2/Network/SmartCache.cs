@@ -280,173 +280,173 @@ namespace SecureSocketProtocol2.Network
             switch (mode)
             {
                 case CacheMode.SimpleByteScan:
+                {
+                    SmartCacheInfo inf = new SmartCacheInfo(0, 0, 0, false);
+                    for (int i = Offset, j = 0; i < Length; )
                     {
-                        SmartCacheInfo inf = new SmartCacheInfo(0, 0, 0, false);
-                        for (int i = Offset, j = 0; i < Length; )
-                        {
-                            int RamCacheIndex = j % RamCache.Length;
-                            int length = MemCmp(data, i, RamCache, RamCacheIndex);
+                        int RamCacheIndex = j % RamCache.Length;
+                        int length = MemCmp(data, i, RamCache, RamCacheIndex);
 
-                            if (length > 0)
+                        if (length > 0)
+                        {
+                            inf.CacheIndex = RamCacheIndex;
+                            inf.DataIndex = i;
+                            inf.Length = length;
+                            inf.IsInCache = true;
+                            inf.instruction = Instruction.MEMCPY;
+                            callback(inf);
+                        }
+                        else
+                        {
+                            //first byte in offset wasn't equal
+                            //lets scan to see how far it goes
+                            fixed (byte* ptr1 = data, ptr2 = RamCache)
+                            {
+                                for (int o = i; o < Length; o++)
+                                {
+                                    if (ptr1[o] != ptr2[o % RamCache.Length])
+                                        length++;
+                                    else
+                                        break;
+                                }
+                            }
+                            inf.CacheIndex = -1;
+                            inf.DataIndex = i;
+                            inf.Length = length;
+                            inf.IsInCache = false;
+                            inf.instruction = Instruction.NEWDATA;
+                            callback(inf);
+                        }
+                        i += length;
+                        j += length;
+                    }
+                    break;
+                }
+                case CacheMode.QuickByteScan:
+                {
+                    SmartCacheInfo inf = new SmartCacheInfo(0, 0, 0, false);
+                    int remaining = Length;
+                    for (int i = Offset, j = 0; i < Length; )
+                    {
+                        int RamCacheIndex = j % RamCache.Length;
+                        if (RamCache.Length - RamCacheIndex <= 4)
+                            RamCacheIndex = 0;
+
+                        int length = 0;
+                        int loops = (RamCache.Length - RamCacheIndex) / 4;
+                        int DataLoops = (Length - i) / 4;
+
+                        bool EqualLoop = true;
+
+                        fixed (byte* ptr1 = &(RamCache[RamCacheIndex]), ptr2 = &(data[i]))
+                        {
+                            uint* RamCachePtr = (uint*)ptr1;
+                            uint* DataPtr = (uint*)ptr2;
+                            EqualLoop = RamCachePtr[0] == DataPtr[0];
+                            for (int o = 0; o < loops && o < DataLoops; o++)
+                            {
+                                if (EqualLoop ? RamCachePtr[o] == DataPtr[o] : RamCachePtr[o] != DataPtr[o])
+                                    length++;
+                                else
+                                    EqualLoop = false;
+                            }
+                        }
+
+                        if (length > 0)
+                        {
+                            if (EqualLoop)
                             {
                                 inf.CacheIndex = RamCacheIndex;
                                 inf.DataIndex = i;
-                                inf.Length = length;
+                                inf.Length = length * 4;
                                 inf.IsInCache = true;
                                 inf.instruction = Instruction.MEMCPY;
                                 callback(inf);
                             }
                             else
                             {
-                                //first byte in offset wasn't equal
-                                //lets scan to see how far it goes
-                                fixed (byte* ptr1 = data, ptr2 = RamCache)
-                                {
-                                    for (int o = i; o < Length; o++)
-                                    {
-                                        if (ptr1[o] != ptr2[o % RamCache.Length])
-                                            length++;
-                                        else
-                                            break;
-                                    }
-                                }
                                 inf.CacheIndex = -1;
                                 inf.DataIndex = i;
-                                inf.Length = length;
+                                inf.Length = length * 4;
                                 inf.IsInCache = false;
                                 inf.instruction = Instruction.NEWDATA;
                                 callback(inf);
                             }
-                            i += length;
-                            j += length;
                         }
-                        break;
-                    }
-                case CacheMode.QuickByteScan:
-                    {
-                        SmartCacheInfo inf = new SmartCacheInfo(0, 0, 0, false);
-                        int remaining = Length;
-                        for (int i = Offset, j = 0; i < Length; )
+                        else
                         {
-                            int RamCacheIndex = j % RamCache.Length;
-                            if (RamCache.Length - RamCacheIndex <= 4)
-                                RamCacheIndex = 0;
+                            //no more data
+                            break;
+                        }
 
-                            int length = 0;
-                            int loops = (RamCache.Length - RamCacheIndex) / 4;
-                            int DataLoops = (Length - i) / 4;
+                        remaining -= length * 4;
+                        Offset += length * 4;
+                        j += length * 4;
+                        i += length * 4;
+                    }
 
-                            bool EqualLoop = true;
+                    if (remaining > 0)
+                    {
+                        inf.CacheIndex = -1;
+                        inf.DataIndex = Offset;
+                        inf.Length = remaining;
+                        inf.IsInCache = false;
+                        inf.instruction = Instruction.NEWDATA;
+                        callback(inf);
+                    }
+                    break;
+                }
+                case CacheMode.RandomPosition:
+                {
+                    for (int i = Offset; i < Length; )
+                    {
+                        int length = i + ChunkSize > Length ? Length - i : ChunkSize;
+                        byte[] hashdata = hasher.ComputeHash(data, i, length);
+                        BigInteger val = new BigInteger(hashdata);
+                        int index = HashTableContains(val);
+                        SmartCacheInfo inf = null;
 
-                            fixed (byte* ptr1 = &(RamCache[RamCacheIndex]), ptr2 = &(data[i]))
+                        if (index == -1)
+                        {
+                            //keep looking to see what the length is
+                            int size = 0;
+
+                            if (length == ChunkSize)
                             {
-                                uint* RamCachePtr = (uint*)ptr1;
-                                uint* DataPtr = (uint*)ptr2;
-                                EqualLoop = RamCachePtr[0] == DataPtr[0];
-                                for (int o = 0; o < loops && o < DataLoops; o++)
+                                for (int j = i; j < Length; j += length)
                                 {
-                                    if (EqualLoop ? RamCachePtr[o] == DataPtr[o] : RamCachePtr[o] != DataPtr[o])
-                                        length++;
-                                    else
-                                        EqualLoop = false;
-                                }
-                            }
-
-                            if (length > 0)
-                            {
-                                if (EqualLoop)
-                                {
-                                    inf.CacheIndex = RamCacheIndex;
-                                    inf.DataIndex = i;
-                                    inf.Length = length * 4;
-                                    inf.IsInCache = true;
-                                    inf.instruction = Instruction.MEMCPY;
-                                    callback(inf);
-                                }
-                                else
-                                {
-                                    inf.CacheIndex = -1;
-                                    inf.DataIndex = i;
-                                    inf.Length = length * 4;
-                                    inf.IsInCache = false;
-                                    inf.instruction = Instruction.NEWDATA;
-                                    callback(inf);
+                                    length = j + ChunkSize > Length ? Length - j : ChunkSize;
+                                    hashdata = hasher.ComputeHash(data, j, length);
+                                    val = new BigInteger(hashdata);
+                                    if (HashTableContains(val) != -1 || size + length > 65535) //instructions only supports USHORT as size
+                                        break;
+                                    size += length;
                                 }
                             }
                             else
                             {
-                                //no more data
-                                break;
+                                size = length;
                             }
 
-                            remaining -= length * 4;
-                            Offset += length * 4;
-                            j += length * 4;
-                            i += length * 4;
-                        }
-
-                        if (remaining > 0)
-                        {
-                            inf.CacheIndex = -1;
-                            inf.DataIndex = Offset;
-                            inf.Length = remaining;
-                            inf.IsInCache = false;
+                            //int not found, lets see how 
+                            inf = new SmartCacheInfo(-1, i, size, false);
                             inf.instruction = Instruction.NEWDATA;
                             callback(inf);
+                            i += length;
                         }
-                        break;
-                    }
-                case CacheMode.RandomPosition:
-                    {
-                        for (int i = Offset; i < Length; )
+                        else
                         {
-                            int length = i + ChunkSize > Length ? Length - i : ChunkSize;
-                            byte[] hashdata = hasher.ComputeHash(data, i, length);
-                            BigInteger val = new BigInteger(hashdata);
-                            int index = HashTableContains(val);
-                            SmartCacheInfo inf = null;
+                            SmartCacheInfo CacheInf = HashTable[index];
+                            //WriteDebugInf(data, i, CacheInf.CacheIndex);
 
-                            if (index == -1)
-                            {
-                                //keep looking to see what the length is
-                                int size = 0;
-
-                                if (length == ChunkSize)
-                                {
-                                    for (int j = i; j < Length; j += length)
-                                    {
-                                        length = j + ChunkSize > Length ? Length - j : ChunkSize;
-                                        hashdata = hasher.ComputeHash(data, j, length);
-                                        val = new BigInteger(hashdata);
-                                        if (HashTableContains(val) != -1 || size + length > 65535) //instructions only supports USHORT as size
-                                            break;
-                                        size += length;
-                                    }
-                                }
-                                else
-                                {
-                                    size = length;
-                                }
-
-                                //int not found, lets see how 
-                                inf = new SmartCacheInfo(-1, i, size, false);
-                                inf.instruction = Instruction.NEWDATA;
-                                callback(inf);
-                                i += length;
-                            }
-                            else
-                            {
-                                SmartCacheInfo CacheInf = HashTable[index];
-                                //WriteDebugInf(data, i, CacheInf.CacheIndex);
-
-                                inf = new SmartCacheInfo(CacheInf.CacheIndex, i, 0, true); //0 index for now just see what the length is of the MemCmp
-                                inf.Length = MemCmp(data, i, RamCache, CacheInf.CacheIndex);
-                                callback(inf);
-                            }
-                            i += inf.Length;
+                            inf = new SmartCacheInfo(CacheInf.CacheIndex, i, 0, true); //0 index for now just see what the length is of the MemCmp
+                            inf.Length = MemCmp(data, i, RamCache, CacheInf.CacheIndex);
+                            callback(inf);
                         }
-                        break;
+                        i += inf.Length;
                     }
+                    break;
+                }
             }
         }
 

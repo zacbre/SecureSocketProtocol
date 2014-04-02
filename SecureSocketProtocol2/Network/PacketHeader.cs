@@ -20,6 +20,7 @@ namespace SecureSocketProtocol2.Network
         public uint Hash { get; set; }
         public uint ChannelId { get; set; }
         private Connection connection;
+        public uint PeerId { get; set; }
 
         public PacketHeader(byte[] header, int offset, Connection connection)
         {
@@ -37,6 +38,7 @@ namespace SecureSocketProtocol2.Network
             CurPacketId = pr.ReadUShort();
             Hash = pr.ReadUInteger();
             ChannelId = pr.ReadUInteger();
+            PeerId = pr.ReadUInteger();
         }
 
         public PacketHeader(Connection connection)
@@ -67,12 +69,10 @@ namespace SecureSocketProtocol2.Network
 
             pw.WriteUInteger(Hash);
             pw.WriteUInteger(ChannelId);
-
-            //write protection data, if compressed/cached
-            pw.WriteBytes(new byte[connection.protection.LayerCount]);
+            pw.WriteUInteger(PeerId);
 
             //trash data
-            byte[] tempJumk = new byte[connection.Client.HeaderTrashCount];
+            byte[] tempJumk = new byte[connection.Client.HeaderJunkCount];
             new Random().NextBytes(tempJumk);
             pw.WriteBytes(tempJumk);
         }

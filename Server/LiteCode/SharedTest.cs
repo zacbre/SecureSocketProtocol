@@ -15,37 +15,37 @@ namespace Server.LiteCode
 
         }
 
-        [RemoteExecutionAttribute]
+        [RemoteExecutionAttribute(0, null)]
         public void CallTest()
         {
             //Console.WriteLine("CallTest is called!");
         }
 
-        [RemoteExecutionAttribute]
+        [RemoteExecutionAttribute(0, null)]
         public string StringTest()
         {
             return "Some random message";
         }
 
-        [RemoteExecutionAttribute]
+        [RemoteExecutionAttribute(0, null)]
         public int IntegerTest()
         {
             return 1337;
         }
 
-        [RemoteExecution]
+        [RemoteExecution(0, null)]
         public void SecretShit()
         {
 
         }
 
-        [RemoteExecutionAttribute]
+        [RemoteExecution(0, null)]
         public byte[] ByteArrayTest()
         {
             return new byte[60000];
         }
 
-        [RemoteExecution]
+        [RemoteExecution(0, null)]
         public void DelegateTest(Callback<string> Delly)
         {
             //string RetStr = Delly("Message from server");

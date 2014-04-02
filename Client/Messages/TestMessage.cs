@@ -8,9 +8,9 @@ using System.Text;
 
 namespace Client.Messages
 {
-    public class TestMessage : IMessage
+    public class TestMessage : IPeerMessage
     {
-        public byte[] Stuff = new byte[60000];
+        public byte[] Stuff = new byte[65535];
         public decimal Graf;
         public int PauperGraf;
 

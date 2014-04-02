@@ -1,9 +1,9 @@
 ﻿using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Messages.TCP;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using SecureSocketProtocol2.Network.Messages.TCP.LiteCode;
 using SecureSocketProtocol2.Network.Messages.TCP.StreamMessages;
+using SecureSocketProtocol2.Network.RootSocket;
 using SecureSocketProtocol2.Plugin;
 using System;
 using System.Collections.Generic;
@@ -22,15 +22,15 @@ namespace SecureSocketProtocol2.Network
         private TaskQueue<IMessage> CloseChannelQueue;
         private TaskQueue<IMessage> DisconnectedQueue;
         private TaskQueue<IMessage> OpenChannelQueue;
-        private TaskQueue<IMessage> OpenChannelResponseQueue;
+        private TaskQueue<IMessage> ResponseQueue;
         private TaskQueue<IMessage> PacketTaskQueue;
         private TaskQueue<IMessage> PayloadQueue;
         private TaskQueue<IMessage> KeepAliveQueue;
         private TaskQueue<PluginRecvInfo> PluginDataQueue;
         private TaskQueue<IMessage> StreamQueue;
         private TaskQueue<IMessage> LiteCodeQueue;
-        private TaskQueue<IMessage> LiteCodeResponseQueue;
         private TaskQueue<IMessage> LiteCodeDelegateQueue;
+        private TaskQueue<IPeerMessage> RootSocketQueue;
         private SocketAsyncEventArgs asyncReceiveEvent;
 
         internal bool InvokedOnDisconnect = false;
@@ -82,13 +82,13 @@ namespace SecureSocketProtocol2.Network
                     try
                     {
                         //let's check the certificate
-                        if (Client.Certificate.ValidFrom > DateTime.Now)
+                        if (Client.Certificate.ValidFrom > (Client.ServerSided ? DateTime.Now : Client.TimeSync)) //DateTime.Now)
                         {
                             //we need to wait till the time is right
                             Client.Disconnect(DisconnectReason.CertificatePastValidTime);
                             return;
                         }
-                        if (Client.Certificate.ValidTo < DateTime.Now)
+                        if (Client.Certificate.ValidTo < (Client.ServerSided ? DateTime.Now : Client.TimeSync))//DateTime.Now)
                         {
                             //certificate is not valid anymore
                             Client.Disconnect(DisconnectReason.CertificatePastValidTime);
@@ -164,6 +164,7 @@ namespace SecureSocketProtocol2.Network
                                 uint offset = (uint)stream.Position;
                                 PacketHeader header = stream.NetworkPayload.Header;
                                 IPlugin plugin = null;
+                                uint GenHash = 0;
 
                                 if (stream.NetworkPayload.Header.PacketID == PacketId.PluginPacket)
                                 {
@@ -175,13 +176,101 @@ namespace SecureSocketProtocol2.Network
 
                                 if (Client.Certificate != null)
                                 {
-                                    uint Hash = stream.NetworkPayload.Header.HashPayload(payload, (int)offset, (int)packetSize, Client.Certificate.Checksum);
+                                    GenHash = stream.NetworkPayload.Header.HashPayload(payload, (int)offset, (int)packetSize, Client.Certificate.Checksum);
 
-                                    if (stream.NetworkPayload.Header.Hash != Hash)
+                                    if (stream.NetworkPayload.Header.Hash != GenHash)
                                     {
                                         Client.Disconnect(DisconnectReason.DataModificationDetected);
                                         return;
                                     }
+                                }
+
+                                //peer code
+                                if (stream.NetworkPayload.Header.PeerId != 0 && stream.NetworkPayload.Header.PacketID == PacketId.RootSocket_Payload)
+                                {
+                                    if (stream.NetworkPayload.Header.PeerId == Client.VirtualIpInt && !Client.ServerSided)
+                                    {
+                                        //we arrived at the target peer !
+                                        IPeerMessage PeerMsg = null;
+                                        try
+                                        {
+                                            PeerMsg = (IPeerMessage)messageHandler.HandleMessage(new PayloadReader(payload) { Offset = (int)offset }, stream.NetworkPayload.Header.MessageId);
+
+                                            if (PeerMsg != null)
+                                            {
+                                                PeerMsg.RawSize = stream.NetworkPayload.Header.PacketSize;
+                                                PeerMsg.DecompressedRawSize = payload.Length;
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Client.onException(ex, ErrorType.Core);
+                                            return;
+                                        }
+
+                                        lock (Client.PeerConnections)
+                                        {
+                                            RootPeer peer = null;
+                                            if (Client.PeerConnections.TryGetValue(PeerMsg.ConnectionId, out peer))
+                                            {
+                                                /*try
+                                                {
+                                                    if (!peer.DPI.Inspect(stream.NetworkPayload.Header, PeerMsg))
+                                                    {
+                                                        Client.Disconnect(DisconnectReason.DeepPacketInspectionDisconnection);
+                                                        return;
+                                                    }
+                                                }
+                                                catch { }*/
+
+                                                PeerMsg.Peer = peer;
+                                                RootSocketQueue.Enqueue(PeerMsg);
+                                            }
+                                        }
+                                    }
+                                    else if (Client.ServerSided)
+                                    {
+                                        SSPClient TargetClient = null;
+
+                                        lock (Client.PeerConnections)
+                                        {
+                                            for (int i = 0; i < Client.PeerConnections.Count; i++)
+                                            {
+                                                RootPeer rootPeer = Client.PeerConnections.Values[i];
+                                                if (rootPeer.FromClient != null && rootPeer.FromClient.VirtualIpInt == stream.NetworkPayload.Header.PeerId)
+                                                {
+                                                    TargetClient = rootPeer.FromClient;
+                                                    break;
+                                                }
+                                                if (rootPeer.ToClient != null && rootPeer.ToClient.VirtualIpInt == stream.NetworkPayload.Header.PeerId)
+                                                {
+                                                    TargetClient = rootPeer.ToClient;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (TargetClient != null)
+                                        {
+                                            //no protection is being applied to the payload
+                                            //the protection should already have been applied
+                                            //when the client sended this data to the server
+                                            NetworkPayloadWriter pw = new NetworkPayloadWriter(this);
+                                            pw.WriteBytes(payload, (int)offset, receivedSize);
+                                            TargetClient.Connection.SendPayload(pw, stream.NetworkPayload.Header.MessageId,
+                                                                                PacketId.RootSocket_Payload, false, null, null,
+                                                                                stream.NetworkPayload.Header.PeerId);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        //strange...
+                                    }
+
+                                    this.stream.ReceiveState = ReceiveType.Header;
+                                    stream.Position += receivedSize;
+                                    payload = null;
+                                    break;
                                 }
 
                                 //decrypt, decompress, de-cache the data we received
@@ -210,6 +299,7 @@ namespace SecureSocketProtocol2.Network
                                     if (message != null)
                                     {
                                         message.RawSize = stream.NetworkPayload.Header.PacketSize;
+                                        message.DecompressedRawSize = payload.Length;
                                     }
                                 }
                                 catch (Exception ex)
@@ -260,19 +350,16 @@ namespace SecureSocketProtocol2.Network
                                         DisconnectedQueue.Enqueue(message);
                                         break;
                                     }
-                                    case PacketId.KeepAlive:
-                                    {
-                                        KeepAliveQueue.Enqueue(message);
-                                        break;
-                                    }
                                     case PacketId.OpenChannel:
                                     {
                                         OpenChannelQueue.Enqueue(message);
                                         break;
                                     }
                                     case PacketId.OpenChannelResponse:
+                                    case PacketId.LiteCodeResponse:
+                                    case PacketId.KeepAlive:
                                     {
-                                        OpenChannelResponseQueue.Enqueue(message);
+                                        ResponseQueue.Enqueue(message);
                                         break;
                                     }
                                     case PacketId.Payload:
@@ -293,11 +380,6 @@ namespace SecureSocketProtocol2.Network
                                     case PacketId.LiteCode:
                                     {
                                         LiteCodeQueue.Enqueue(message);
-                                        break;
-                                    }
-                                    case PacketId.LiteCodeResponse:
-                                    {
-                                        LiteCodeResponseQueue.Enqueue(message);
                                         break;
                                     }
                                     case PacketId.LiteCode_Delegates:
@@ -348,29 +430,21 @@ namespace SecureSocketProtocol2.Network
                 }
             }
         }
-        private void onCloseChannelQueue(IMessage message)
-        {
-            MsgCloseChannel msg = message as MsgCloseChannel;
-            if ((msg = message as MsgCloseChannel) != null)
-                msg.ProcessPayload(Client);
-        }
         private void onDisconnectedQueue(IMessage message)
         {
             MsgDisconnected msg = message as MsgDisconnected;
             if ((msg = message as MsgDisconnected) != null)
                 msg.ProcessPayload(Client);
         }
-        private void onOpenChannelQueue(IMessage message)
+        private void onResponseQueue(IMessage message)
         {
-            MsgOpenChannel msg = message as MsgOpenChannel;
-            if ((msg = message as MsgOpenChannel) != null)
-                msg.ProcessPayload(Client);
-        }
-        private void onOpenChannelResponseQueue(IMessage message)
-        {
-            MsgOpenChannelResponse msg = message as MsgOpenChannelResponse;
-            if ((msg = message as MsgOpenChannelResponse) != null)
-                msg.ProcessPayload(Client);
+            if ((message as MsgOpenStreamResponse) != null ||
+                (message as MsgExecuteMethodResponse) != null ||
+                (message as MsgGetSharedClassResponse) != null ||
+                (message as MsgKeepAlive) != null)
+            {
+                message.ProcessPayload(Client);
+            }
         }
         private void onPluginDataQueue(PluginRecvInfo pluginInfo)
         {
@@ -401,7 +475,7 @@ namespace SecureSocketProtocol2.Network
             }
 
             PayloadReader pr = new PayloadReader(msgPacketQueue.Data);
-            while (pr.Offset < pr.Packet.Length)
+            while (pr.Offset < pr.Length)
             {
                 PacketId packetId = (PacketId)pr.ReadByte();
                 byte Duplicates = pr.ReadByte();
@@ -492,7 +566,7 @@ namespace SecureSocketProtocol2.Network
         }
         private void onLiteCodeQueue(IMessage message)
         {
-            if (message as MsgExecuteMethod != null || message as MsgGetSharedClass != null)
+            if (message as MsgExecuteMethod != null || message as MsgGetSharedClass != null || message as MsgDisposeClass != null)
             {
                 message.ProcessPayload(Client);
             }
@@ -510,6 +584,10 @@ namespace SecureSocketProtocol2.Network
             {
                 message.ProcessPayload(Client);
             }
+        }
+        private void onRootSocketQueue(IPeerMessage message)
+        {
+            message.Peer.onReceiveMessage(message);
         }
 
         internal SyncObject Receive(ReceiveCallback callback)

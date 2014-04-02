@@ -20,19 +20,28 @@ namespace SecureSocketProtocol2.Shared
         internal Type BaseClassType;
         [NonSerialized]
         internal object InitializedClass;
+
+        [NonSerialized]
+        internal int SharedInitializeCounter;
+
+        public int MaxInitializations { get; private set; }
         internal bool CanRemove { get; set; }
-        public string Name { get; private set; }
+        public string TypeName { get; private set; }
+        public string SharedName { get; private set; }
         internal int SharedId { get; set; }
         public List<Type[]> ConstructorTypes { get; private set; }
         public bool RemoteInitialize { get; private set; }
         public SharedMethod[] Methods { get; private set; }
+
+        public bool IsDisposed { get; internal set; }
 
         /// <summary>  </summary>
         /// <param name="Object">The Class object to share with others</param>
         /// <param name="RemoteInitialize">False: The class will be initialized locally using the "ClassArgs" objects,
         ///                                True: The remote client will give the ClassArgs to use for initializing the object and will ignore the local argument objects</param>
         /// <param name="ClassArgs">The objects to initialize the class with</param>
-        internal SharedClass(Type ClassType, IClient Client, bool RemoteInitialize = false, params object[] ClassArgs)
+        /// <param name="MaxInitializations">The maximum count that the class can be shared </param>
+        internal SharedClass(string SharedName, Type ClassType, IClient Client, bool RemoteInitialize = false, int MaxInitializations = 100, params object[] ClassArgs)
         {
             if (ClassType == null)
                 throw new ArgumentNullException("Object");
@@ -46,10 +55,12 @@ namespace SecureSocketProtocol2.Shared
             if (this.BaseClassTypeArgs == null)
                 this.BaseClassTypeArgs = new object[0];
 
-            this.Name = ClassType.Name;
+            this.TypeName = ClassType.FullName;
+            this.SharedName = SharedName;
             this.Client = Client;
             this.ConstructorTypes = new List<Type[]>();
             this.RemoteInitialize = RemoteInitialize;
+            this.MaxInitializations = MaxInitializations;
 
             List<SharedMethod> methods = new List<SharedMethod>();
             foreach (MethodInfo m in ClassType.GetMethods())
@@ -86,7 +97,6 @@ namespace SecureSocketProtocol2.Shared
         ~SharedClass()
         {
             InitializedClass = null;
-            Name = null;
             SharedId = 0;
             _Methods = null;
         }
@@ -141,6 +151,9 @@ namespace SecureSocketProtocol2.Shared
 
         public object Invoke(int MethodId, params object[] args)
         {
+            if (IsDisposed)
+                throw new Exception("The shared class is disposed");
+
             SharedMethod method = GetMethod(MethodId);
             lock (method.InvokeLocky)
             {

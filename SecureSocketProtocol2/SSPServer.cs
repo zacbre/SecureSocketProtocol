@@ -1,5 +1,7 @@
-﻿using SecureSocketProtocol2.Misc;
+﻿using SecureSocketProtocol2.Interfaces.Shared;
+using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
+using SecureSocketProtocol2.Network.RootSocket;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -9,11 +11,14 @@ using System.Threading;
 
 namespace SecureSocketProtocol2
 {
-    public abstract class SSPServer<ClientType> : IDisposable
+    public abstract class SSPServer : IDisposable
     {
-        public abstract void onConnectionAccept(ClientType client);
-        public abstract void onConnectionClosed(ClientType client);
+        public abstract void onConnectionAccept(SSPClient client);
+        public abstract void onConnectionClosed(SSPClient client);
         public abstract void onException(Exception ex);
+        public abstract bool onAuthentication(SSPClient client, string Username, string Password);
+        public abstract bool onPeerConnectionRequest(SSPClient FromClient, SSPClient ToClient);
+        public abstract bool onPeerCreateDnsRequest(string DnsName, SSPClient Requestor);
 
         internal object AuthLock = new object();
         internal Socket TcpServer;
@@ -22,11 +27,13 @@ namespace SecureSocketProtocol2
         private SocketAsyncEventArgs udpAsyncSocket;
         public ServerProperties serverProperties { get; private set; }
         private Type baseClient;
-        private SortedList<decimal, SSPClient> Clients;
+        internal SortedList<decimal, SSPClient> Clients { get; private set; }
         private Random random = new Random(DateTime.Now.Millisecond);
         private RandomDecimal randomDecimal = new RandomDecimal(DateTime.Now.Millisecond);
         private bool Running = false;
         internal PrivateKeyHandler KeyHandler;
+
+        public RootDns RootSocket_DNS { get; private set; }
 
         /// <summary>
         /// Initialize a new SSPServer
@@ -40,7 +47,6 @@ namespace SecureSocketProtocol2
             this.KeyHandler = new PrivateKeyHandler(serverProperties.GenerateKeysInBackground);
             this.serverProperties = serverProperties;
             this.Clients = new SortedList<decimal, SSPClient>();
-            this.baseClient = typeof(ClientType);
             this.TcpServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             this.TcpServer.Bind(new IPEndPoint(IPAddress.Parse(serverProperties.ListenIp), serverProperties.ListenPort));
             this.TcpServer.Listen(100);
@@ -67,6 +73,8 @@ namespace SecureSocketProtocol2
                 }
             }
 
+            this.RootSocket_DNS = new RootDns();
+
             this.asyncSocket = new SocketAsyncEventArgs();
             this.asyncSocket.Completed += AsyncAction;
             //ThreadPool.QueueUserWorkItem(ServerThread);
@@ -87,18 +95,19 @@ namespace SecureSocketProtocol2
                 case SocketAsyncOperation.Accept:
                 {
                     //keep receiving connections
-                    SSPClient client = (SSPClient)Activator.CreateInstance(baseClient, serverProperties.BaseClientArguments);
+                    SSPClient client = serverProperties.GetNewClient();
                     client.Handle = e.AcceptSocket;
                     client.Connection = new Connection(client);
                     client.RemoteIp = ((IPEndPoint)e.AcceptSocket.RemoteEndPoint).Address.ToString();
-                    client.ClientId = randomDecimal.NextDecimal();//new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//
+                    client.Connection.ClientId = randomDecimal.NextDecimal();//new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//
                     client.ServerAllowsReconnecting = client.ReconnectAtDisconnect;
-                    client.ServerSided = true;
+                    client.Server = this;
+                    client.Connection.State = ConnectionState.Open;
 
                     lock(Clients)
                     {
                         while(Clients.ContainsKey(client.ClientId))
-                            client.ClientId = randomDecimal.NextDecimal();
+                            client.Connection.ClientId = randomDecimal.NextDecimal();
                         Clients.Add(client.ClientId, client);
                     }
 
@@ -126,7 +135,6 @@ namespace SecureSocketProtocol2
                         client.Disconnect(DisconnectReason.HandShakeFailed);
                         return;
                     }
-                    client.State = ConnectionState.Open;
 
                     try
                     {
@@ -138,8 +146,23 @@ namespace SecureSocketProtocol2
                     }
 
                     client.StartReceiver();
-                    client.onClientConnect();
-                    onConnectionAccept((ClientType)((object)client));
+
+                    try
+                    {
+                        client.SharedClientRoot = client.GetSharedClass<ISharedClientRoot>("ROOTSOCKET_CLIENT");
+                    }
+                    catch(Exception ex)
+                    {
+                        //the shared class must exist
+                        client.Disconnect();
+                        break;
+                    }
+
+                    if (client.State != ConnectionState.Reconnecting)
+                    {
+                        client.onClientConnect();
+                    }
+                    onConnectionAccept(client);
                     break;
                 }
             }
@@ -186,6 +209,32 @@ namespace SecureSocketProtocol2
                 SSPClient[] c = new SSPClient[Clients.Count];
                 Clients.Values.CopyTo(c, 0);
                 return c;
+            }
+        }
+
+        internal string GetNewVirtualIp()
+        {
+            lock(Clients)
+            {
+                Random rnd = new Random(DateTime.Now.Millisecond);
+                string VirtualIp = rnd.Next(1, 255) + "." + rnd.Next(1, 255) + "." + rnd.Next(1, 255) + "." + rnd.Next(1, 255);
+
+                while(GetClient(VirtualIp) != null)
+                    VirtualIp = rnd.Next(1, 255) + "." + rnd.Next(1, 255) + "." + rnd.Next(1, 255) + "." + rnd.Next(1, 255);
+                return VirtualIp;
+            }
+        }
+
+        public SSPClient GetClient(string VirtualIp)
+        {
+            lock (Clients)
+            {
+                for (int i = 0; i < Clients.Count; i++)
+                {
+                    if (Clients.Values[i].VirtualIP == VirtualIp)
+                        return Clients.Values[i];
+                }
+                return null;
             }
         }
 

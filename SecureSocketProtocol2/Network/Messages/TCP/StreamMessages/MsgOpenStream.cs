@@ -1,5 +1,4 @@
 ﻿using SecureSocketProtocol2.Interfaces;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using System;
 using System.Collections.Generic;
 using System.Text;

@@ -1,8 +1,10 @@
 ﻿using SecureSocketProtocol2;
+using SecureSocketProtocol2.Cache.CacheMethods;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Protections;
+using SecureSocketProtocol2.Network.Protections.Cache;
 using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Plugin;
 using Server.LiteCode;
@@ -105,26 +107,17 @@ namespace Server
 
         public override void onAddProtection(Protection protection)
         {
-            protection.AddProtection(new QuickLzProtection());
+            //protection.AddProtection(new QuickLzProtection());
+            //protection.AddProtection(new CacheProtection(new SimpleCache(Connection.MAX_PAYLOAD)));
         }
 
-        public override uint HeaderTrashCount
+        public override uint HeaderJunkCount
         {
             get { return 5; }
         }
         public override uint PrivateKeyOffset
         {
             get { return 45634232; }
-        }
-
-        public override bool onAuthentication(string Username, string Password)
-        {
-            Console.WriteLine("Authenication, Username:" + Username + ", Password:" + Password);
-
-            if (Username == "Dergan" && Password == "0215C4D7AC62DF61A7ACCAD0E4EDEFC0A2BD4C50D656DA8282069291A1F216977B9AD9D28FCD40B5DE787288E067873847B523A084C169883762F30A5F7EEF89")
-                return true;
-
-            return false;
         }
 
         public override void onAuthenticated()
@@ -144,6 +137,18 @@ namespace Server
         public override void onShareClasses()
         {
             base.ShareClass("SharedTest", typeof(SharedTest));
+        }
+
+        public override bool onPeerConnectionRequest(SecureSocketProtocol2.Network.RootSocket.RootPeer peer)
+        {
+            //should never happen at server side
+            Console.WriteLine("onPeerConnectionRequest got executed which should never happen... strange");
+            return false;
+        }
+
+        public override SecureSocketProtocol2.Network.RootSocket.RootPeer onGetNewPeerObject()
+        {
+            return new Peer();
         }
     }
 }

@@ -12,7 +12,6 @@ namespace SecureSocketProtocol2.Interfaces
         void onClientConnect();
         void onDisconnect(DisconnectReason Reason);
         void onException(Exception ex, ErrorType errorType);
-        void onShareClasses();
         void Disconnect();
     }
 }

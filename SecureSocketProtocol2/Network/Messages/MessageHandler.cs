@@ -1,6 +1,5 @@
 ﻿using SecureSocketProtocol2.Hashers;
 using SecureSocketProtocol2.Network.Messages.TCP;
-using SecureSocketProtocol2.Network.Messages.TCP.Channels;
 using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using SecureSocketProtocol2.Network.Messages.TCP.LiteCode;
 using SecureSocketProtocol2.Network.Messages.TCP.StreamMessages;
@@ -17,8 +16,8 @@ namespace SecureSocketProtocol2.Network.Messages
         private SortedList<uint, Type> Messages;
         internal uint Seed { get; private set; }
         private MurmurHash2Unsafe hasher;
-        public MessageCache SendCache;
-        public MessageCache ReceiveCache;
+        internal MessageCache SendCache;
+        internal MessageCache ReceiveCache;
 
         public MessageHandler(int Seed)
         {
@@ -59,6 +58,8 @@ namespace SecureSocketProtocol2.Network.Messages
                 AddMessage(typeof(MsgUdpHandshake), "UDP_HANDSHAKE"); //use incase if UDP is going to be used
                 AddMessage(typeof(MsgTimeSync), "TIME_SYNCHRONISATION");
                 AddMessage(typeof(MsgTimeSyncResponse), "TIME_SYNCHRONISATION_RESPONSE");
+                AddMessage(typeof(MsgClientSettings), "HANDSHAKE_CLIENT_SETTINGS");
+                
             }
         }
 
@@ -68,7 +69,8 @@ namespace SecureSocketProtocol2.Network.Messages
         /// <param name="message">The message type to add</param>
         /// <param name="IdentifyKey">The key to identify the sending and receiving message, the identify key must be unique</param>
         /// <param name="Seed">The seed to use</param>
-        public void AddMessage(Type MessageType, string IdentifyKey, uint Seed)
+        /// <returns>If false the message did already exist otherwise true</returns>
+        public bool AddMessage(Type MessageType, string IdentifyKey, uint Seed)
         {
             lock (Messages)
             {
@@ -78,9 +80,10 @@ namespace SecureSocketProtocol2.Network.Messages
                 if (MessageType.GetConstructor(new Type[0]) == null)
                     throw new Exception("The type must contain a constructor with no arguments");
                 if (Messages.ContainsKey(messageId))
-                    throw new Exception("A message with this IdentifyKey(" + IdentifyKey + ") already exists");
+                    return false;
 
                 Messages.Add(messageId, MessageType);
+                return true;
             }
         }
 
@@ -109,7 +112,7 @@ namespace SecureSocketProtocol2.Network.Messages
                     if (Messages.Values[i] == MessageType)
                         return Messages.Keys[i];
                 }
-                throw new Exception("Message Id not found, Message not registered ?");
+                throw new Exception("Message Id not found, Message not registered ? " + MessageType.FullName);
             }
         }
 
@@ -123,7 +126,7 @@ namespace SecureSocketProtocol2.Network.Messages
 
                 IMessage message = (IMessage)Activator.CreateInstance(type, new object[0]);
                 message.ReadPacket(message, reader, this);
-                message.RawSize = reader.Packet.Length;
+                message.RawSize = reader.Length;
                 return message;
             }
         }
@@ -138,7 +141,7 @@ namespace SecureSocketProtocol2.Network.Messages
 
                 IMessage message = (IMessage)Activator.CreateInstance(type, new object[0]);
                 message.ReadUdpPacket(message, reader);
-                message.RawSize = reader.Packet.Length;
+                message.RawSize = reader.Length;
                 return message;
             }
         }
@@ -151,9 +154,6 @@ namespace SecureSocketProtocol2.Network.Messages
             Messages.Clear();
             AddMessage(typeof(MsgOk), "HANDSHAKE_OK");
             AddMessage(typeof(MsgKeepAlive), "KEEP_ALIVE");
-            AddMessage(typeof(MsgCloseChannel), "CHANNEL_CLOSE");
-            AddMessage(typeof(MsgOpenChannel), "CHANNEL_OPEN");
-            AddMessage(typeof(MsgOpenChannelResponse), "CHANNEL_OPEN_RESPONSE");
             AddMessage(typeof(MsgDisconnected), "CHANNEL_CLOSED");
             AddMessage(typeof(MsgPluginCount), "HANDSHAKE_PLUGIN_COUNT");
             AddMessage(typeof(MsgGetPluginInfo), "HANDSHAKE_GET_PLUGIN_INFO");
@@ -166,10 +166,12 @@ namespace SecureSocketProtocol2.Network.Messages
             AddMessage(typeof(MsgStreamData), "STREAM_DATA");
             AddMessage(typeof(MsgCloseStream), "STREAM_CLOSE");
             AddMessage(typeof(MsgPacketQueue), "PACKET_QUEUE_DATA");
-            AddMessage(typeof(MsgGetSharedClass), "GET_SHARED_CLASS");
-            AddMessage(typeof(MsgGetSharedClassResponse), "GET_SHARED_CLASS_RESPONSE");
-            AddMessage(typeof(MsgExecuteMethod), "EXECUTE_METHOD");
-            AddMessage(typeof(MsgExecuteMethodResponse), "EXECUTE_METHOD_RESPONSE");
+
+            AddMessage(typeof(MsgGetSharedClass), "LITECODE_GET_SHARED_CLASS");
+            AddMessage(typeof(MsgGetSharedClassResponse), "LITECODE_GET_SHARED_CLASS_RESPONSE");
+            AddMessage(typeof(MsgExecuteMethod), "LITECODE_EXECUTE_METHOD");
+            AddMessage(typeof(MsgExecuteMethodResponse), "LITECODE_EXECUTE_METHOD_RESPONSE");
+            AddMessage(typeof(MsgDisposeClass), "LITECODE_DISPOSE_CLASS");
         }
     }
 }

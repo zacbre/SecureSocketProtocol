@@ -47,7 +47,7 @@ namespace SecureSocketProtocol2.Shared
                                                                                              new Type[] { prototype });
 
                     //add our RootSocket info, I did on purpose "$" so u can't directly access this variable
-                    FieldBuilder fb = typeBuilder.DefineField("$haredClass", typeof(SharedClass), FieldAttributes.Private);
+                    FieldBuilder fb = typeBuilder.DefineField("$haredClass", typeof(SharedClass), FieldAttributes.Public);
 
                     DuplicateMethods(typeBuilder, prototype, fb, sharedClass);
                     CreateConstructor(typeBuilder, fb);

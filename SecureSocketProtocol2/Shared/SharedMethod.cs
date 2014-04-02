@@ -27,9 +27,9 @@ namespace SecureSocketProtocol2.Shared
         private Random rnd = new Random(new Random(DateTime.Now.Millisecond).Next());
         public bool usePacketQueue { get; private set; }
         public bool useUdp { get; private set; }
-        public bool NoWaitingTime { get; private set; }
-        [NonSerialized]
-        private TaskQueue<object[]> MethodTaskCalls;
+
+        public uint TimeOutLength { get; private set; }
+        public object TimeOutValue { get; private set; }
 
         internal SharedMethod(MethodInfo info, SharedClass sharedClass, bool isDelegate = false, int DelegateId = 0)
         {
@@ -51,8 +51,7 @@ namespace SecureSocketProtocol2.Shared
                         {
                             isUnchecked = (parameters[i].GetCustomAttributes(typeof(UncheckedRemoteExecutionAttribute), false).Length > 0),
                             UsePacketQueue = (parameters[i].GetCustomAttributes(typeof(PacketQueueAttribute), false).Length > 0),
-                            UseUDP = (parameters[i].GetCustomAttributes(typeof(UdpMethodAttribute), false).Length > 0),
-                            NoWaitingTime = (parameters[i].GetCustomAttributes(typeof(NoWaitMethodAttribute), false).Length > 0)
+                            UseUDP = (parameters[i].GetCustomAttributes(typeof(UdpMethodAttribute), false).Length > 0)
                         });
                     }
                 }
@@ -63,7 +62,14 @@ namespace SecureSocketProtocol2.Shared
             this.Unchecked = (info.GetCustomAttributes(typeof(UncheckedRemoteExecutionAttribute), false).Length > 0);
             this.usePacketQueue = (info.GetCustomAttributes(typeof(PacketQueueAttribute), false).Length > 0);
             this.useUdp = (info.GetCustomAttributes(typeof(UdpMethodAttribute), false).Length > 0);
-            this.NoWaitingTime = (info.GetCustomAttributes(typeof(NoWaitMethodAttribute), false).Length > 0);
+
+            object[] tempAttr = info.GetCustomAttributes(typeof(RemoteExecutionAttribute), false);
+            if (tempAttr.Length > 0)
+            {
+                TimeOutLength = (tempAttr[0] as RemoteExecutionAttribute).TimeOut;
+                TimeOutValue = (tempAttr[0] as RemoteExecutionAttribute).TimeOutValue;
+            }
+
             types.Clear();
             types = null;
             this.CanReturn = info.ReturnType.FullName != "System.Void";
@@ -134,7 +140,6 @@ namespace SecureSocketProtocol2.Shared
                     sharedDel.sharedMethod.Unchecked = this.Unchecked; //DelegateIndex.Values[i].isUnchecked;
                     sharedDel.sharedMethod.usePacketQueue = this.usePacketQueue;//DelegateIndex.Values[i].UsePacketQueue;
                     sharedDel.sharedMethod.useUdp = this.useUdp;//DelegateIndex.Values[i].UseUDP;
-                    sharedDel.sharedMethod.NoWaitingTime = this.NoWaitingTime;//DelegateIndex.Values[i].NoWaitingTime;
                     pw.WriteObject(sharedDel);
 
                     if (!isDelegate)
@@ -164,7 +169,13 @@ namespace SecureSocketProtocol2.Shared
                     sharedClass.Client.Connection.Requests.Add(RequestId, syncObject);
                     sharedClass.Client.Connection.SendMessage(new MsgExecuteMethod(RequestId, pw.ToByteArray(), true), isDelegate ? PacketId.LiteCode_Delegates : PacketId.LiteCode);
                 }
-                RetObject = syncObject.Wait<ReturnResult>(null, 0);
+                RetObject = syncObject.Wait<ReturnResult>(null, TimeOutLength);
+
+                if (syncObject.TimedOut)
+                {
+                    //copying the object in memory, maybe a strange way todo it but it works
+                    RetObject = new ReturnResult(serializer.Deserialize(serializer.Serialize(this.TimeOutValue)), false);
+                }
             }
 
             /*if (callback != null)
@@ -188,18 +199,11 @@ namespace SecureSocketProtocol2.Shared
 
         public object Invoke(params object[] args)
         {
-            object obj = null;
+            if (sharedClass.IsDisposed)
+                throw new Exception("The shared class is disposed");
 
-            if (this.NoWaitingTime)
-            {
-                if (this.MethodTaskCalls == null)
-                    this.MethodTaskCalls = new TaskQueue<object[]>(sharedClass.Client, InvokeTask);
-                this.MethodTaskCalls.Enqueue(args);
-            }
-            else
-            {
-                _Invoke(ref obj, args);
-            }
+            object obj = null;
+            _Invoke(ref obj, args);
             return obj;
         }
 

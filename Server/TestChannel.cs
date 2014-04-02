@@ -32,7 +32,7 @@ namespace Server
 
         public override void onReceiveMessage(IMessage message)
         {
-            Received += message.RawSize;
+            Received += message.DecompressedRawSize;
             PacketsPerSec++;
 
             if (speedSW.ElapsedMilliseconds >= 1000)

@@ -4,6 +4,7 @@ using SecureSocketProtocol2.Network.Messages.TCP.Handshake;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using SecureSocketProtocol2.Network.Messages;
 
 namespace SecureSocketProtocol2.Network.Handshake.Server
 {
@@ -22,6 +23,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             {
                 return new HandshakeType[]
                 {
+                    HandshakeType.ReceiveMessage,
                     HandshakeType.SendMessage
                 };
             }
@@ -33,6 +35,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             {
                 return new HandshakeType[]
                 {
+                    HandshakeType.SendMessage,
                     HandshakeType.ReceiveMessage
                 };
             }
@@ -40,6 +43,27 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
 
         public override bool onHandshake()
         {
+            SyncObject syncObject = null;
+            if (!(syncObject = base.ReceiveMessage((IMessage message) =>
+            {
+                MsgClientSettings mcs = message as MsgClientSettings;
+
+                if (mcs != null)
+                {
+                    Client.PeersAllowed = mcs.AllowPeers;
+                    Client.ChannelsAllowed = mcs.AllowChannels;
+                    return true;
+                }
+                return false;
+            })).Wait<bool>(false, 30000))
+            {
+                Client.Disconnect(DisconnectReason.TimeOut);
+                Client.onException(new Exception("Handshake went wrong, CHS_ClientInfo"), ErrorType.Core);
+                if (syncObject.TimedOut)
+                    throw new TimeoutException(OutOfSyncMessage);
+                throw new Exception("Failed to retrieve the Client Settings");
+            }
+
             Random rnd = new Random(DateTime.Now.Millisecond);
             if (serverProperties.AllowUdp)
             {
@@ -48,7 +72,8 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             }
 
             Client.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();
-            base.SendMessage(new MsgClientInfo(Client.ClientId, Client.UdpHandshakeCode, Client.Token));
+            Client.VirtualIP = Client.Server.GetNewVirtualIp();
+            base.SendMessage(new MsgClientInfo(Client.ClientId, Client.UdpHandshakeCode, Client.Token, Client.VirtualIP));
             return true;
         }
     }

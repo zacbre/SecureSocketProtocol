@@ -142,7 +142,7 @@ namespace SecureSocketProtocol2.Network
                 {
                     BinaryFormatter bf = new BinaryFormatter();
                     bf.Binder = new DeserializationBinder();
-                    return bf.Deserialize(new MemoryStream(pr.ReadBytes(pr.Packet.Length - pr.Offset)));
+                    return bf.Deserialize(new MemoryStream(pr.ReadBytes(pr.Length - pr.Offset)));
                 }
                 case ObjectTypes.Byte: return pr.ReadByte();
                 case ObjectTypes.Short: return pr.ReadShort();
@@ -158,7 +158,7 @@ namespace SecureSocketProtocol2.Network
                 case ObjectTypes.ByteArray: return pr.ReadBytes(pr.ReadInteger());
                 case ObjectTypes.Bitmap:
                 {
-                    using (MemoryStream stream = new MemoryStream(pr.Packet, pr.Offset, pr.Packet.Length - pr.Offset))
+                    using (MemoryStream stream = new MemoryStream(pr.Buffer, pr.Offset, pr.Length - pr.Offset))
                     {
                         long oldPos = stream.Position;
                         Bitmap bmp = (Bitmap)Bitmap.FromStream(stream);

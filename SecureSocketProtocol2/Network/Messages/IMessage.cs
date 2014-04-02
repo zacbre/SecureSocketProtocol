@@ -14,6 +14,9 @@ namespace SecureSocketProtocol2.Network.Messages
         /// <summary> This is the message in raw size we received </summary>
         public int RawSize { get; set; }
 
+        /// <summary> This is the message in raw size after decompression </summary>
+        public int DecompressedRawSize { get; set; }
+
         public IMessage()
         {
 

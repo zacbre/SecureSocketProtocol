@@ -9,6 +9,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.Handshake
         public decimal ClientId;
         public decimal Token;
         public byte[] UdpHandshakeCode;
+        public string VirtualIP;
 
         public MsgClientInfo()
             : base()
@@ -16,12 +17,13 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.Handshake
 
         }
 
-        public MsgClientInfo(decimal ClientId, byte[] UdpHandshakeCode, decimal Token)
+        public MsgClientInfo(decimal ClientId, byte[] UdpHandshakeCode, decimal Token, string VirtualIP)
             : base()
         {
             this.ClientId = ClientId;
             this.UdpHandshakeCode = UdpHandshakeCode;
             this.Token = Token;
+            this.VirtualIP = VirtualIP;
         }
     }
 }

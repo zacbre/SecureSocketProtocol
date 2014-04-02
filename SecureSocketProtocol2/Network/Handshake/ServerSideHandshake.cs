@@ -23,6 +23,7 @@ namespace SecureSocketProtocol2.Network.Handshake
             this.HandShakes.Add(new SHS_ClientInfo(client, serverProperties));
             this.HandShakes.Add(new SHS_UDP(client, serverProperties, UdpClient));
             this.HandShakes.Add(new SHS_Plugins(client, getClientsDelegate));
+            this.HandShakes.Add(new SHS_ShareClasses(client));
         }
 
         public bool DoHandshake()
@@ -31,13 +32,12 @@ namespace SecureSocketProtocol2.Network.Handshake
             {
                 if (!handShake.DoHandshake())
                 {
-                    Console.WriteLine(handShake.GetType().Name + ", FAILED");
                     Client.Disconnect(DisconnectReason.HandShakeFailed);
                     return false;
                 }
             }
 
-            Client.Handshaked = true;
+            Client.Connection.Handshaked = true;
 
             return true;
         }
