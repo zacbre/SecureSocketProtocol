@@ -86,6 +86,7 @@ namespace SecureSocketProtocol2.Shared.SharedClasses
                     }
                     catch { HasPermission = false; }
 
+
                     if (HasPermission)
                     {
                         RootPeer TargetPeer = client.onGetNewPeerObject();

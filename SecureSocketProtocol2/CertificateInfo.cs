@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Security.Cryptography.X509Certificates;
 
 namespace SecureSocketProtocol2
 {
@@ -32,7 +33,7 @@ namespace SecureSocketProtocol2
         /// </summary>
         public CertificateInfo()
         {
-            
+
         }
     }
 }

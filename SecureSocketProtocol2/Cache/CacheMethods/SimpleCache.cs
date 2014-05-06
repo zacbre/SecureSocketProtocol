@@ -46,11 +46,10 @@ namespace SecureSocketProtocol2.Cache.CacheMethods
                     pw.WriteInteger(length);
                     pw.WriteBytes(Input, i, length);
 
-                    //copy changed data to the cache buffer
-                    Array.Copy(Input, i, base.CacheBuffer, RamCacheIndex, length);
-
                     CacheInfo inf = new CacheInfo(-1, i, length, false, Instruction.NEWDATA);
                     inf.instruction = Instruction.NEWDATA;
+
+
                 }
                 i += length;
                 j += length;
@@ -60,31 +59,11 @@ namespace SecureSocketProtocol2.Cache.CacheMethods
 
         public override bool Decache(byte[] Input, int Offset, int Length, MemoryStream Output)
         {
-            int ReadOffset = Offset;
-            int SrcOffset = 0;
-            while (ReadOffset + 5 <= Length)
+            //PayloadReader pr = new PayloadReader(
+            /*while (Output.Position + 5 < Output.Length)
             {
-                CachingType type = (CachingType)Input[ReadOffset];
-                int DataLength = BitConverter.ToInt32(Input, ReadOffset+1);
-                ReadOffset += 5;
 
-                switch (type)
-                {
-                    case CachingType.Equal:
-                    {
-                        Output.Write(base.DecacheBuffer, SrcOffset, DataLength);
-                        break;
-                    }
-                    case CachingType.NotEqual:
-                    {
-                        Array.Copy(Input, ReadOffset, base.DecacheBuffer, SrcOffset, DataLength);
-                        Output.Write(base.DecacheBuffer, SrcOffset, DataLength);
-                        ReadOffset += DataLength;
-                        break;
-                    }
-                }
-                SrcOffset += DataLength;
-            }
+            }*/
             return true;
         }
 

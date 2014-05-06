@@ -1,10 +1,8 @@
 ﻿using SecureSocketProtocol2;
-using SecureSocketProtocol2.Cache.CacheMethods;
 using SecureSocketProtocol2.Misc;
 using SecureSocketProtocol2.Network;
 using SecureSocketProtocol2.Network.Messages;
 using SecureSocketProtocol2.Network.Protections;
-using SecureSocketProtocol2.Network.Protections.Cache;
 using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Plugin;
 using Server.LiteCode;
@@ -107,8 +105,7 @@ namespace Server
 
         public override void onAddProtection(Protection protection)
         {
-            //protection.AddProtection(new QuickLzProtection());
-            //protection.AddProtection(new CacheProtection(new SimpleCache(Connection.MAX_PAYLOAD)));
+            protection.AddProtection(new QuickLzProtection());
         }
 
         public override uint HeaderJunkCount

@@ -100,12 +100,8 @@ namespace SecureSocketProtocol2.Network
                 CurPacketId++;
                 header.MessageId = MessageId;
                 npw.vStream.Position = 0;
+                header.WriteHeader(payload, (int)offset, (int)PayloadLength, npw);
 
-                try
-                {
-                    header.WriteHeader(payload, (int)offset, (int)PayloadLength, npw);
-                }
-                catch { }
                 //let's not re-write to NPW when nothing has modified
                 if (protection.LayerCount > 0 && ApplyProtection)
                 {

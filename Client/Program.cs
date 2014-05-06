@@ -25,7 +25,6 @@ using SecureSocketProtocol2.Network.Protections.Compression;
 using SecureSocketProtocol2.Network.RootSocket;
 using SecureSocketProtocol2.Cache;
 using SecureSocketProtocol2.Cache.CacheMethods;
-using SecureSocketProtocol2.Network.Protections.Cache;
 
 namespace Client
 {
@@ -49,7 +48,7 @@ namespace Client
             }, null, 30000,//login
                "Dergan", "Hunter:)"))
         {
-
+            
         }
 
         static void Main(string[] args)
@@ -60,11 +59,6 @@ namespace Client
             MemoryStream OutStream = new MemoryStream();
 
             ICache cache = new SimpleCache(5000000);
-            cache.Cache(data, 0, data.Length, InStream);
-            cache.Decache(InStream.ToArray(), 0, (int)InStream.Length, OutStream);
-
-            InStream = new MemoryStream();
-            OutStream = new MemoryStream();
             cache.Cache(data, 0, data.Length, InStream);
             cache.Decache(InStream.ToArray(), 0, (int)InStream.Length, OutStream);
 
@@ -204,13 +198,10 @@ namespace Client
             Peer peer = new Peer();
             PeerErrorCode errorCode = base.ConnectToPeer(ResolvedDns, peer);
 
-            if (errorCode == PeerErrorCode.Success)
+            while (true)
             {
-                Console.WriteLine("Connected to peer");
-                while (true)
-                {
-                    peer.SendMessage(new TestMessage());
-                }
+                peer.SendMessage(new TestMessage());
+                Thread.Sleep(1);
             }
             return;
 
@@ -348,8 +339,10 @@ namespace Client
             Console.WriteLine("ValidFrom: " + certificate.ValidFrom);
             Console.WriteLine("ValidTo: " + certificate.ValidTo);
 
-            //if (Console.ReadLine() != "y")
-            //    return false;
+            if (new CertForm(certificate.ImgCertificate).ShowDialog() != DialogResult.OK)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -363,8 +356,7 @@ namespace Client
 
         public override void onAddProtection(Protection protection)
         {
-            //protection.AddProtection(new QuickLzProtection());
-            //protection.AddProtection(new CacheProtection(new SimpleCache(Connection.MAX_PAYLOAD)));
+            protection.AddProtection(new QuickLzProtection());
         }
 
         public override uint HeaderJunkCount

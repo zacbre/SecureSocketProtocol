@@ -48,7 +48,6 @@
     <Compile Include="Attributes\RemoteExecutionAttribute.cs" />
     <Compile Include="Attributes\UdpMethodAttribute.cs" />
     <Compile Include="Attributes\UncheckedRemoteExecutionAttribute.cs" />
-    <Compile Include="Cache\CacheMethods\BufferedCache.cs" />
     <Compile Include="Cache\CacheMethods\SimpleCache.cs" />
     <Compile Include="Cache\ICache.cs" />
     <Compile Include="CertificateInfo.cs" />
@@ -204,7 +203,6 @@
     <Compile Include="Network\RootSocket\RootDnsInfo.cs" />
     <Compile Include="Network\RootSocket\RootPeer.cs" />
     <Compile Include="Network\RootSocket\RootDns.cs" />
-    <Compile Include="Network\RootSocket\RootRecvInfo.cs" />
     <Compile Include="Network\SecureStream.cs" />
     <Compile Include="Network\Messages\UDP\MsgUdpHandshake.cs" />
     <Compile Include="Network\NetworkPayload.cs" />
@@ -217,7 +215,7 @@
     <Compile Include="Network\PayloadReader.cs" />
     <Compile Include="Network\PayloadWriter.cs" />
     <Compile Include="Network\PrivateKeyHandler.cs" />
-    <Compile Include="Network\Protections\Cache\CacheProtection.cs" />
+    <Compile Include="Network\Protections\Cache\SmartCacheProtection.cs" />
     <Compile Include="Network\Protections\Compression\GzipProtection.cs" />
     <Compile Include="Network\Protections\Compression\LZ4Protection.cs" />
     <Compile Include="Network\Protections\Compression\LZMAProtection.cs" />

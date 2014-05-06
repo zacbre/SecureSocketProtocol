@@ -11,12 +11,7 @@ namespace SecureSocketProtocol2.Network
         private MemoryStream stream;
         public PayloadReader(byte[] packet)
         {
-            this.stream = new MemoryStream(packet, 0, packet.Length, false, true);
-        }
-        public PayloadReader(MemoryStream stream)
-        {
-            stream.GetBuffer(); //test the stream if the buffer is public
-            this.stream = stream;
+            stream = new MemoryStream(packet, 0, packet.Length, false, true);
         }
 
         public int Offset
@@ -66,31 +61,36 @@ namespace SecureSocketProtocol2.Network
 
         public short ReadShort()
         {
-            return BitConverter.ToInt16(ReadBytes(2), 0);
+            short result = BitConverter.ToInt16(ReadBytes(2), 0);
+            return result;
         }
         public ushort ReadUShort()
         {
-            return BitConverter.ToUInt16(ReadBytes(2), 0);
+            ushort result = BitConverter.ToUInt16(ReadBytes(2), 0);
+            return result;
         }
 
         public double ReadDouble()
         {
-            return BitConverter.ToDouble(ReadBytes(8), 0);
+            double result = BitConverter.ToDouble(ReadBytes(8), 0);
+            return result;
         }
 
         public long ReadLong()
         {
-            return BitConverter.ToInt64(ReadBytes(8), 0);
+            long result = BitConverter.ToInt64(ReadBytes(8), 0);
+            return result;
         }
 
         public ulong ReadULong()
         {
-            return BitConverter.ToUInt64(ReadBytes(8), 0);
+            ulong result = BitConverter.ToUInt64(ReadBytes(8), 0);
+            return result;
         }
 
         public decimal ReadDecimal()
         {
-            using (BinaryReader reader = new BinaryReader(new MemoryStream(ReadBytes(16))))
+            using (BinaryReader reader = new BinaryReader(stream))
             {
                 return reader.ReadDecimal();
             }

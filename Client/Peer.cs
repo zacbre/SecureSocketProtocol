@@ -25,8 +25,8 @@ namespace Client
             Received += (ulong)message.DecompressedRawSize;
             PacketsPerSec++;
 
-            //(message as TestMessage).Stuff = new byte[5];
-            //SendMessage(message);
+            (message as TestMessage).Stuff = new byte[5];
+            SendMessage(message);
 
             if (sw.ElapsedMilliseconds >= 1000)
             {

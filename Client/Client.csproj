@@ -43,6 +43,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CertForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="CertForm.Designer.cs">
+      <DependentUpon>CertForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="LiteCode\ISharedTest.cs" />
     <Compile Include="Messages\TestMessage.cs" />
     <Compile Include="Peer.cs" />
@@ -58,6 +64,11 @@
       <Project>{158d26c2-6132-4285-b99a-b42383a10c3b}</Project>
       <Name>SecureSocketProtocol2</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="CertForm.resx">
+      <DependentUpon>CertForm.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

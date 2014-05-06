@@ -32,6 +32,7 @@ namespace SecureSocketProtocol2.Network.Handshake
             {
                 if (!handShake.DoHandshake())
                 {
+                    Console.WriteLine(handShake.GetType().Name + ", FAILED");
                     Client.Disconnect(DisconnectReason.HandShakeFailed);
                     return false;
                 }
