@@ -31,7 +31,7 @@ namespace SecureSocketProtocol2.Network
         private TaskQueue<IMessage> LiteCodeQueue;
         private TaskQueue<IMessage> LiteCodeDelegateQueue;
         private TaskQueue<IPeerMessage> RootSocketQueue;
-        private SocketAsyncEventArgs asyncReceiveEvent;
+        private byte[] ReceiveBuffer;
 
         internal bool InvokedOnDisconnect = false;
 
@@ -44,19 +44,23 @@ namespace SecureSocketProtocol2.Network
                 return; //don't start the network stream twice
 
             this.stream = new NetworkStream(this, networkStreamCallback);
-
-            asyncReceiveEvent = new SocketAsyncEventArgs();
-            asyncReceiveEvent.Completed += AsyncSocketCallback;
-            //asyncReceiveEvent.SetBuffer(stream.Buffer, 0, stream.Buffer.Length);
-
-            asyncReceiveEvent.SetBuffer(new byte[70000], 0, 70000);
-            if (!Handle.ReceiveAsync(asyncReceiveEvent))
-                AsyncSocketCallback(null, this.asyncReceiveEvent);
+            ReceiveBuffer = new byte[70000];
+            Handle.BeginReceive(ReceiveBuffer, 0, ReceiveBuffer.Length, SocketFlags.None, AsyncSocketCallback, null);
         }
 
-        private void AsyncSocketCallback(object o, SocketAsyncEventArgs e)
+        private void AsyncSocketCallback(IAsyncResult result)
         {
-            if (e.SocketError == SocketError.SocketError || e.BytesTransferred == 0)
+            int BytesTransferred = 0;
+            try
+            {
+                BytesTransferred = Handle.EndReceive(result);
+            }
+            catch
+            {
+                
+            }
+
+            if (BytesTransferred <= 0)
             {
                 try
                 {
@@ -75,48 +79,40 @@ namespace SecureSocketProtocol2.Network
 
             this.LastPacketSW = Stopwatch.StartNew();
 
-            switch (e.LastOperation)
+            try
             {
-                case SocketAsyncOperation.Receive:
+                //let's check the certificate
+                if (Client.Certificate.ValidFrom > (Client.ServerSided ? DateTime.Now : Client.TimeSync)) //DateTime.Now)
                 {
-                    try
-                    {
-                        //let's check the certificate
-                        if (Client.Certificate.ValidFrom > (Client.ServerSided ? DateTime.Now : Client.TimeSync)) //DateTime.Now)
-                        {
-                            //we need to wait till the time is right
-                            Client.Disconnect(DisconnectReason.CertificatePastValidTime);
-                            return;
-                        }
-                        if (Client.Certificate.ValidTo < (Client.ServerSided ? DateTime.Now : Client.TimeSync))//DateTime.Now)
-                        {
-                            //certificate is not valid anymore
-                            Client.Disconnect(DisconnectReason.CertificatePastValidTime);
-                            return;
-                        }
+                    //we need to wait till the time is right
+                    Client.Disconnect(DisconnectReason.CertificatePastValidTime);
+                    return;
+                }
+                if (Client.Certificate.ValidTo < (Client.ServerSided ? DateTime.Now : Client.TimeSync))//DateTime.Now)
+                {
+                    //certificate is not valid anymore
+                    Client.Disconnect(DisconnectReason.CertificatePastValidTime);
+                    return;
+                }
 
-                        BytesIn += (ulong)e.BytesTransferred;
-                        //to make it 2x faster remove Array.Copy and set buffer offset in asyncReceiveEvent
-                        //too bad i've not acomplished this yet some really weird shit is happening then
-                        int writeOffset = stream.Write(e.Buffer, 0, e.BytesTransferred);
-                        this.stream.Flush();
+                BytesIn += (ulong)BytesTransferred;
+                //to make it 2x faster remove Array.Copy and set buffer offset in asyncReceiveEvent
+                //too bad i've not acomplished this yet some really weird shit is happening then
+                int writeOffset = stream.Write(ReceiveBuffer, 0, BytesTransferred);
+                this.stream.Flush();
 
-                        if (!Handle.ReceiveAsync(asyncReceiveEvent))
-                            AsyncSocketCallback(null, this.asyncReceiveEvent);
-                    }
-                    catch (Exception ex)
-                    {
-                        /*if (Client.ServerAllowsReconnecting)
-                        {
-                            Client.Connect(ConnectionState.Reconnecting);
-                        }
-                        else*/
-                        {
-                            Client.Disconnect(DisconnectReason.UnexpectedlyDisconnected);
-                            Client.onException(ex, ErrorType.Core);
-                        }
-                    }
-                    break;
+                Handle.BeginReceive(ReceiveBuffer, 0, ReceiveBuffer.Length, SocketFlags.None, AsyncSocketCallback, null);
+            }
+            catch (Exception ex)
+            {
+                /*if (Client.ServerAllowsReconnecting)
+                {
+                    Client.Connect(ConnectionState.Reconnecting);
+                }
+                else*/
+                {
+                    Client.Disconnect(DisconnectReason.UnexpectedlyDisconnected);
+                    Client.onException(ex, ErrorType.Core);
                 }
             }
         }

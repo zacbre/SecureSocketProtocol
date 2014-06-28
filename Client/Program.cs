@@ -53,7 +53,7 @@ namespace Client
 
         static void Main(string[] args)
         {
-            byte[] data = new byte[] { 1,2,3,4,5,6,7,8,9 };
+            /*byte[] data = new byte[] { 1,2,3,4,5,6,7,8,9 };
 
             MemoryStream InStream = new MemoryStream();
             MemoryStream OutStream = new MemoryStream();
@@ -62,7 +62,7 @@ namespace Client
             cache.Cache(data, 0, data.Length, InStream);
             cache.Decache(InStream.ToArray(), 0, (int)InStream.Length, OutStream);
 
-            /*WopEncryption wopEncryption = new WopEncryption(new ulong[] {
+            WopEncryption wopEncryption = new WopEncryption(new ulong[] {
                 861335890, 388626021, 404588533, 738562051, 143466081,
                 813679996, 890571662, 823294427, 135787739, 421508041,
                 841473000, 552393879, 397881016, 459668250, 512708703,
@@ -186,7 +186,7 @@ namespace Client
             ISharedTest SharedTest = base.GetSharedClass<ISharedTest>("SharedTest");
 
 
-            string ResolvedDns = base.ResolveDns("TestRootSocket");
+            /*string ResolvedDns = base.ResolveDns("TestRootSocket");
             if (ResolvedDns.Length == 0)
             {
                 base.RegisterDns("TestRootSocket");
@@ -203,7 +203,7 @@ namespace Client
                 peer.SendMessage(new TestMessage());
                 Thread.Sleep(1);
             }
-            return;
+            return;*/
 
             Benchmark BenchLiteCode = new Benchmark();
             int speedy = 0;
@@ -244,7 +244,7 @@ namespace Client
             TestMessage message = new TestMessage();
             int ChannelsClosed = 0;
 
-            while(true)
+            while(false)
             {
                 TestChannel channel = new TestChannel();
                 
@@ -270,11 +270,12 @@ namespace Client
             while (base.Connected)
             {
                 packets++;
+                DataPerSec += (ulong)message.Stuff.Length;
                 SharedTest.SendByteArray(message.Stuff);
 
                 if (sw.ElapsedMilliseconds >= 1000)
                 {
-                    Console.WriteLine("last data size: " + message.Stuff + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
+                    Console.WriteLine("last data size: " + message.Stuff.Length + ", pps:" + packets + ", data/sec:" + DataPerSec + " [" + Math.Round(((float)DataPerSec / 1000F) / 1000F, 2) + "MBps] " + (Math.Round((((float)DataPerSec / 1000F) / 1000F) / 1000F, 2) * 8F) + "Gbps");
                     packets = 0;
                     DataPerSec = 0;
                     sw = Stopwatch.StartNew();

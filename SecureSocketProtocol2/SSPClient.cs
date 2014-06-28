@@ -65,7 +65,6 @@ namespace SecureSocketProtocol2
         public abstract IPlugin[] onGetPlugins();
 
         public SSPServer Server { get; internal set; }
-
         public Connection Connection { get; set; }
         public bool isUsingProxy { get; private set; }
         public string RemoteIp { get; internal set; }
@@ -76,6 +75,10 @@ namespace SecureSocketProtocol2
         public bool Handshaked { get { return Connection.Handshaked; } }
         public ulong TotalBytesIn { get { return Connection.BytesIn; } }
         public ulong TotalBytesOut { get { return Connection.BytesOut; } }
+
+        internal Random random { get; private set; }
+        internal RandomDecimal randomDec { get; private set; }
+
 
         /// <summary>
         /// A server-client time synchronisation, Server takes the lead in having the time.
@@ -218,6 +221,8 @@ namespace SecureSocketProtocol2
             this.ReconnectAtDisconnect = AllowReconnect;
             this.baseChannel = BaseChannel;
             this.baseChannelArgs = BaseChannelArgs;
+            this.random = new Random();
+            this.randomDec = new RandomDecimal(random.Next());
         }
 
         /// <summary>
@@ -391,35 +396,41 @@ namespace SecureSocketProtocol2
 
         public InterfacePrototype GetSharedClass<InterfacePrototype>(string name, params object[] RemoteArgs)
         {
-            SyncObject syncObject = null;
-            lock (Connection.Requests)
+            lock (Connection.InitializedClasses)
             {
-                Random rnd = new Random(DateTime.Now.Millisecond);
-                int RequestId = RequestId = rnd.Next();
-                while (Connection.Requests.ContainsKey(RequestId))
-                    RequestId = rnd.Next();
-                syncObject = new SyncObject(this);
-                Connection.Requests.Add(RequestId, syncObject);
-                Connection.SendMessage(new MsgGetSharedClass(name, RemoteArgs, RequestId), PacketId.LiteCode); //send message
-            }
+                SyncObject syncObject = null;
+                lock (Connection.Requests)
+                {
 
-            ReturnResult result = syncObject.Wait<ReturnResult>(null, 30000); //wait for response
-            if (result == null)
-                throw new Exception("A timeout occured" + syncObject.TimedOut + ", " + syncObject.Pulsed + "..." + Connection.Connected);
-            if (result.ExceptionOccured)
-                throw new Exception(result.exceptionMessage);
-            if (result.ReturnValue == null)
-                throw new Exception("The shared class \"" + name + "\" could not be found in the remote client");
-            
-            SharedClass c = (SharedClass)result.ReturnValue;
-            c.Client = this;
-            InterfacePrototype tmp = DynamicClassCreator.CreateDynamicClass<InterfacePrototype>(c);
+                    int RequestId = 0;
 
-            lock (Connection.SharedClasses)
-            {
+                    lock (random)
+                    {
+                        RequestId = random.Next();
+                        while (Connection.Requests.ContainsKey(RequestId))
+                            RequestId = random.Next();
+                    }
+
+                    syncObject = new SyncObject(this);
+                    Connection.Requests.Add(RequestId, syncObject);
+                    Connection.SendMessage(new MsgGetSharedClass(name, RemoteArgs, RequestId), PacketId.LiteCode); //send message
+                }
+
+                ReturnResult result = syncObject.Wait<ReturnResult>(null, 30000); //wait for response
+                if (result == null)
+                    throw new Exception("A timeout occured" + syncObject.TimedOut + ", " + syncObject.Pulsed + "..." + Connection.Connected);
+                if (result.ExceptionOccured)
+                    throw new Exception(result.exceptionMessage);
+                if (result.ReturnValue == null)
+                    throw new Exception("The shared class \"" + name + "\" could not be found in the remote client");
+
+                SharedClass c = (SharedClass)result.ReturnValue;
+                c.Client = this;
+                InterfacePrototype tmp = DynamicClassCreator.CreateDynamicClass<InterfacePrototype>(c);
+
                 Connection.InitializedClasses.Add(c.SharedId, c);
+                return tmp;
             }
-            return tmp;
         }
 
         public void DisposeSharedClass(object SharedClass)

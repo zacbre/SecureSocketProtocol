@@ -10,6 +10,7 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.LiteCode
 {
     internal class MsgGetSharedClass : IMessage
     {
+        private static object Locky = new object();
         public string ClassName;
         public object[] ArgObjects;
         public int RequestId;
@@ -29,71 +30,75 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.LiteCode
 
         public override void ProcessPayload(IClient client, IPlugin plugin = null)
         {
-            ReturnResult result = new ReturnResult(null, false);
-            SSPClient Client = client as SSPClient;
-
-            lock (Client.Connection.SharedClasses)
+            lock (Locky)
             {
+                ReturnResult result = new ReturnResult(null, false);
+                SSPClient Client = client as SSPClient;
+                SharedClass localSharedClass = null;
+
+                lock (Client.Connection.SharedClasses)
+                {
+                    if (!Client.Connection.SharedClasses.TryGetValue(ClassName, out localSharedClass))
+                    {
+                        return;
+                    }
+                }
+
                 try
                 {
-                    SharedClass localSharedClass = null;
-                    if (Client.Connection.SharedClasses.TryGetValue(ClassName, out localSharedClass))
+                    if (localSharedClass.RemoteInitialize)
                     {
-                        if (localSharedClass.RemoteInitialize)
+                        bool FoundConstructor = false;
+
+                        if (ArgObjects.Length > 0)
                         {
-                            bool FoundConstructor = false;
-
-                            if (ArgObjects.Length > 0)
+                            //lets check if there is a constructor with these arguments
+                            for (int i = 0; i < localSharedClass.ConstructorTypes.Count; i++)
                             {
-                                //lets check if there is a constructor with these arguments
-                                for (int i = 0; i < localSharedClass.ConstructorTypes.Count; i++)
+                                if (localSharedClass.ConstructorTypes[i].Length == ArgObjects.Length)
                                 {
-                                    if (localSharedClass.ConstructorTypes[i].Length == ArgObjects.Length)
+                                    bool CorrectArgs = true;
+                                    for (int j = 0; j < ArgObjects.Length; j++)
                                     {
-                                        bool CorrectArgs = true;
-                                        for (int j = 0; j < ArgObjects.Length; j++)
+                                        if (localSharedClass.ConstructorTypes[i][j] != ArgObjects[j].GetType() &&
+                                            localSharedClass.ConstructorTypes[i][j] != ArgObjects[j].GetType().BaseType)
                                         {
-                                            if (localSharedClass.ConstructorTypes[i][j] != ArgObjects[j].GetType() &&
-                                                localSharedClass.ConstructorTypes[i][j] != ArgObjects[j].GetType().BaseType)
-                                            {
-                                                CorrectArgs = false;
-                                                break;
-                                            }
-                                        }
-
-                                        if (CorrectArgs)
-                                        {
-                                            FoundConstructor = true;
+                                            CorrectArgs = false;
                                             break;
                                         }
                                     }
+
+                                    if (CorrectArgs)
+                                    {
+                                        FoundConstructor = true;
+                                        break;
+                                    }
                                 }
-                                if (!FoundConstructor)
-                                    return;
                             }
+                            if (!FoundConstructor)
+                                return;
                         }
+                    }
 
-                        if (localSharedClass.SharedInitializeCounter >= localSharedClass.MaxInitializations)
-                        {
-                            result.ExceptionOccured = true;
-                            result.exceptionMessage = "Reached maximum initializations";
-                        }
-                        else
-                        {
-                            SharedClass sClass = new SharedClass(ClassName, localSharedClass.BaseClassType, Client, localSharedClass.RemoteInitialize, localSharedClass.MaxInitializations, localSharedClass.BaseClassTypeArgs);
-                            sClass.InitializedClass = Activator.CreateInstance(sClass.BaseClassType, localSharedClass.RemoteInitialize ? ArgObjects : sClass.BaseClassTypeArgs);
+                    if (localSharedClass.SharedInitializeCounter >= localSharedClass.MaxInitializations)
+                    {
+                        result.ExceptionOccured = true;
+                        result.exceptionMessage = "Reached maximum initializations";
+                    }
+                    else
+                    {
+                        SharedClass sClass = new SharedClass(ClassName, localSharedClass.BaseClassType, Client, localSharedClass.RemoteInitialize, localSharedClass.MaxInitializations, localSharedClass.BaseClassTypeArgs);
+                        sClass.InitializedClass = Activator.CreateInstance(sClass.BaseClassType, localSharedClass.RemoteInitialize ? ArgObjects : sClass.BaseClassTypeArgs);
 
-                            Random rnd = new Random(DateTime.Now.Millisecond);
-                            int RandomId = rnd.Next();
-                            while (Client.Connection.InitializedClasses.ContainsKey(RandomId))
-                                RandomId = rnd.Next();
+                        int RandomId = Client.Connection.Client.random.Next();
+                        while (Client.Connection.InitializedClasses.ContainsKey(RandomId))
+                            RandomId = Client.Connection.Client.random.Next();
 
-                            sClass.SharedId = RandomId;
-                            Client.Connection.InitializedClasses.Add(RandomId, sClass);
-                            result.ReturnValue = sClass;
+                        sClass.SharedId = RandomId;
+                        Client.Connection.InitializedClasses.Add(RandomId, sClass);
+                        result.ReturnValue = sClass;
 
-                            localSharedClass.SharedInitializeCounter++;
-                        }
+                        localSharedClass.SharedInitializeCounter++;
                     }
                 }
                 catch (Exception ex)
@@ -101,9 +106,9 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.LiteCode
                     result.ExceptionOccured = true;
                     result.exceptionMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 }
+                Client.Connection.SendMessage(new MsgGetSharedClassResponse(RequestId, result), PacketId.LiteCodeResponse);
+                base.ProcessPayload(client);
             }
-            Client.Connection.SendMessage(new MsgGetSharedClassResponse(RequestId, result), PacketId.LiteCodeResponse);
-            base.ProcessPayload(client);
         }
     }
 }

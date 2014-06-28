@@ -72,7 +72,7 @@ namespace Server
 
         public override ushort ListenPort { get { return 444; } }
         public override string ListenIp { get { return "0.0.0.0"; } }
-        public override bool AllowUdp { get { return true; } }
+        public override bool AllowUdp { get { return false; } }
         public override bool UserPassAuthenication { get { return true; } }
 
         public override CertificateInfo ServerCertificate

@@ -64,11 +64,10 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
                 throw new Exception("Failed to retrieve the Client Settings");
             }
 
-            Random rnd = new Random(DateTime.Now.Millisecond);
             if (serverProperties.AllowUdp)
             {
                 Client.UdpHandshakeCode = new byte[50];
-                rnd.NextBytes(Client.UdpHandshakeCode);
+                Client.random.NextBytes(Client.UdpHandshakeCode);
             }
 
             Client.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();
