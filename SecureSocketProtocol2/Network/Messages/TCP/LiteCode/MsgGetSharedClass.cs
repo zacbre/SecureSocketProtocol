@@ -90,9 +90,9 @@ namespace SecureSocketProtocol2.Network.Messages.TCP.LiteCode
                         SharedClass sClass = new SharedClass(ClassName, localSharedClass.BaseClassType, Client, localSharedClass.RemoteInitialize, localSharedClass.MaxInitializations, localSharedClass.BaseClassTypeArgs);
                         sClass.InitializedClass = Activator.CreateInstance(sClass.BaseClassType, localSharedClass.RemoteInitialize ? ArgObjects : sClass.BaseClassTypeArgs);
 
-                        int RandomId = Client.Connection.Client.random.Next();
+                        int RandomId = Client.GetNextRandomInteger();
                         while (Client.Connection.InitializedClasses.ContainsKey(RandomId))
-                            RandomId = Client.Connection.Client.random.Next();
+                            RandomId = Client.GetNextRandomInteger();
 
                         sClass.SharedId = RandomId;
                         Client.Connection.InitializedClasses.Add(RandomId, sClass);

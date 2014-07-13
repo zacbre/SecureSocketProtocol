@@ -164,6 +164,7 @@ namespace Client
             //try
             {
                 //EncryptionTest();
+                while(true)
                 prog = new Program();
             } //catch(Exception ex)
             {
@@ -183,8 +184,7 @@ namespace Client
             Console.Title = "SSP2 Client - ClientId:" + base.ClientId.ToString().Substring(0, 10) + "... - VritualIP:" + base.VirtualIP;
             Console.WriteLine("Connected");
             base.MessageHandler.AddMessage(typeof(TestMessage), "TEST_MESSAGE");
-            ISharedTest SharedTest = base.GetSharedClass<ISharedTest>("SharedTest");
-
+            ISharedTest SharedTest = SharedTest = base.GetSharedClass<ISharedTest>("SharedTest");
 
             /*string ResolvedDns = base.ResolveDns("TestRootSocket");
             if (ResolvedDns.Length == 0)

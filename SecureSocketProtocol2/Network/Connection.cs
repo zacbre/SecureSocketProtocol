@@ -106,6 +106,7 @@ namespace SecureSocketProtocol2.Network
             this.LiteCodeQueue = new TaskQueue<IMessage>(client, onLiteCodeQueue, 100);
             this.LiteCodeDelegateQueue = new TaskQueue<IMessage>(client, onLiteCodeDelegateQueue, 100);
             this.RootSocketQueue = new TaskQueue<IPeerMessage>(client, onRootSocketQueue, 100);
+            this.RequestQueue = new TaskQueue<IMessage>(client, onRequestQueue, 100);
 
             this.messageHandler = new MessageHandler(0);
             this.pluginSystem = new PluginSystem(client);

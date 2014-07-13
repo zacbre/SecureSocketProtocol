@@ -31,6 +31,7 @@ namespace SecureSocketProtocol2.Network
         private TaskQueue<IMessage> LiteCodeQueue;
         private TaskQueue<IMessage> LiteCodeDelegateQueue;
         private TaskQueue<IPeerMessage> RootSocketQueue;
+        private TaskQueue<IMessage> RequestQueue;
         private byte[] ReceiveBuffer;
 
         internal bool InvokedOnDisconnect = false;
@@ -383,6 +384,11 @@ namespace SecureSocketProtocol2.Network
                                         LiteCodeDelegateQueue.Enqueue(message);
                                         break;
                                     }
+                                    case PacketId.RequestMessages:
+                                    {
+                                        RequestQueue.Enqueue(message);
+                                        break;
+                                    }
                                 }
 
                                 this.stream.ReceiveState = ReceiveType.Header;
@@ -438,6 +444,13 @@ namespace SecureSocketProtocol2.Network
                 (message as MsgExecuteMethodResponse) != null ||
                 (message as MsgGetSharedClassResponse) != null ||
                 (message as MsgKeepAlive) != null)
+            {
+                message.ProcessPayload(Client);
+            }
+        }
+        private void onRequestQueue(IMessage message)
+        {
+            if ((message as MsgGetNextId) != null)
             {
                 message.ProcessPayload(Client);
             }

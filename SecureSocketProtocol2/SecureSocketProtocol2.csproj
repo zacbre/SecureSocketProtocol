@@ -182,6 +182,7 @@
     <Compile Include="Network\Messages\TCP\Handshake\MsgGetPluginInfo.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgGetPluginInfoResponse.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgInitPlugin.cs" />
+    <Compile Include="Network\Messages\TCP\MsgGetNextId.cs" />
     <Compile Include="Network\Messages\TCP\MsgKeepAlive.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgMessageSeed.cs" />
     <Compile Include="Network\Messages\TCP\Handshake\MsgPluginCount.cs" />

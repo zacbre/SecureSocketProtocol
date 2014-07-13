@@ -71,6 +71,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             byte[] cryptedKey = RSA.Encrypt(encryptionKey, 0, encryptionKey.Length);
 
             diffieHellman = KeyHandler.GetDiffieHellman();
+
             byte[] diffieStr = diffieHellman.GetDiffie();
             long index = Client.PrivateKeyOffset % 65535;
             if (index <= 4)

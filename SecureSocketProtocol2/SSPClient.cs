@@ -76,8 +76,8 @@ namespace SecureSocketProtocol2
         public ulong TotalBytesIn { get { return Connection.BytesIn; } }
         public ulong TotalBytesOut { get { return Connection.BytesOut; } }
 
-        internal Random random { get; private set; }
-        internal RandomDecimal randomDec { get; private set; }
+        private object NextRandomIdLock = new object();
+        internal SyncObject SyncNextRandomId { get; private set; }
 
 
         /// <summary>
@@ -203,6 +203,8 @@ namespace SecureSocketProtocol2
             }
         }
 
+        internal DateTime ConnectedAt { get; private set; }
+
         //shared classes
         internal ISharedChannel SharedChannel;
         internal ISharedRoot SharedRoot;
@@ -221,8 +223,7 @@ namespace SecureSocketProtocol2
             this.ReconnectAtDisconnect = AllowReconnect;
             this.baseChannel = BaseChannel;
             this.baseChannelArgs = BaseChannelArgs;
-            this.random = new Random();
-            this.randomDec = new RandomDecimal(random.Next());
+            this.ConnectedAt = DateTime.Now;
         }
 
         /// <summary>
@@ -401,15 +402,11 @@ namespace SecureSocketProtocol2
                 SyncObject syncObject = null;
                 lock (Connection.Requests)
                 {
-
                     int RequestId = 0;
 
-                    lock (random)
-                    {
-                        RequestId = random.Next();
-                        while (Connection.Requests.ContainsKey(RequestId))
-                            RequestId = random.Next();
-                    }
+                    RequestId = GetNextRandomInteger();
+                    while (Connection.Requests.ContainsKey(RequestId))
+                        RequestId = GetNextRandomInteger();
 
                     syncObject = new SyncObject(this);
                     Connection.Requests.Add(RequestId, syncObject);
@@ -662,6 +659,54 @@ namespace SecureSocketProtocol2
 
                 if (!UdpHandle.ReceiveFromAsync(UdpAsyncReceiveEvent))
                     AsyncSocketCallback(null, UdpAsyncReceiveEvent);
+            }
+        }
+
+        /// <summary>
+        /// This will request a random id from the server to use, a better way of getting a random number
+        /// </summary>
+        /// <returns>A random decimal number</returns>
+        public long GetNextRandomLong()
+        {
+            decimal number = GetNextRandomDecimal();
+            number %= long.MaxValue;
+            return (int)number;
+        }
+
+        /// <summary>
+        /// This will request a random id from the server to use, a better way of getting a random number
+        /// </summary>
+        /// <returns>A random decimal number</returns>
+        public int GetNextRandomInteger()
+        {
+            decimal number = GetNextRandomDecimal();
+            number %= int.MaxValue;
+            return (int)number;
+        }
+
+        /// <summary>
+        /// This will request a random id from the server to use, a better way of getting a random number
+        /// </summary>
+        /// <returns>A random decimal number</returns>
+        public decimal GetNextRandomDecimal()
+        {
+            if (PeerSide == SecureSocketProtocol2.PeerSide.Server)
+            {
+                return Server.Random.NextDecimal();
+            }
+
+            lock (NextRandomIdLock)
+            {
+                SyncNextRandomId = new SyncObject(this.Connection);
+
+                Connection.SendMessage(new MsgGetNextId(), PacketId.RequestMessages);
+
+                MsgGetNextId response = SyncNextRandomId.Wait<MsgGetNextId>(null, 30000);
+
+                if (response == null)
+                    throw new Exception("A time out occured, ");
+
+                return response.RandomId;
             }
         }
 

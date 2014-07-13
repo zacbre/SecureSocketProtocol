@@ -23,17 +23,15 @@ namespace SecureSocketProtocol2
         internal object AuthLock = new object();
         internal Socket TcpServer;
         internal Socket UdpServer;
-        private SocketAsyncEventArgs asyncSocket;
         private SocketAsyncEventArgs udpAsyncSocket;
         public ServerProperties serverProperties { get; private set; }
         private Type baseClient;
         internal SortedList<decimal, SSPClient> Clients { get; private set; }
-        private Random random = new Random(DateTime.Now.Millisecond);
-        private RandomDecimal randomDecimal = new RandomDecimal(DateTime.Now.Millisecond);
         private bool Running = false;
         internal PrivateKeyHandler KeyHandler;
 
         public RootDns RootSocket_DNS { get; private set; }
+        internal RandomDecimal Random { get; private set; }
 
         /// <summary>
         /// Initialize a new SSPServer
@@ -44,6 +42,7 @@ namespace SecureSocketProtocol2
             if (serverProperties == null)
                 throw new ArgumentNullException("serverProperties");
 
+            this.Random = new RandomDecimal(DateTime.Now.Millisecond);
             this.KeyHandler = new PrivateKeyHandler(serverProperties.GenerateKeysInBackground);
             this.serverProperties = serverProperties;
             this.Clients = new SortedList<decimal, SSPClient>();
@@ -75,97 +74,89 @@ namespace SecureSocketProtocol2
 
             this.RootSocket_DNS = new RootDns();
 
-            this.asyncSocket = new SocketAsyncEventArgs();
-            this.asyncSocket.Completed += AsyncAction;
             //ThreadPool.QueueUserWorkItem(ServerThread);
             this.Running = true;
 
-            if (!this.TcpServer.AcceptAsync(this.asyncSocket))
-                AsyncAction(null, this.asyncSocket);
+            TcpServer.BeginAccept(AsyncAction, null);
         }
 
         int tempId = 0;
-        private void AsyncAction(object o, SocketAsyncEventArgs e)
+        private void AsyncAction(IAsyncResult result)
         {
-            if (e.SocketError != SocketError.Success)
-                return;
-
-            switch(e.LastOperation)
+            Socket AcceptedSocket = null;
+            try
             {
-                case SocketAsyncOperation.Accept:
+                AcceptedSocket = TcpServer.EndAccept(result);
+            }
+            catch { TcpServer.BeginAccept(AsyncAction, null); }
+
+            //keep receiving connections
+            SSPClient client = serverProperties.GetNewClient();
+            client.Handle = AcceptedSocket;
+            client.Connection = new Connection(client);
+            client.RemoteIp = ((IPEndPoint)AcceptedSocket.RemoteEndPoint).Address.ToString();
+            client.Connection.ClientId = Random.NextDecimal();//new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//
+            client.ServerAllowsReconnecting = client.ReconnectAtDisconnect;
+            client.Server = this;
+            client.Connection.State = ConnectionState.Open;
+
+            lock(Clients)
+            {
+                while(Clients.ContainsKey(client.ClientId))
+                    client.Connection.ClientId = Random.NextDecimal();
+                Clients.Add(client.ClientId, client);
+            }
+
+            //accept new client
+            TcpServer.BeginAccept(AsyncAction, null);
+
+            try
+            {
+                if (!client.ServerHandshake(serverProperties, this.UdpServer, GetClients, KeyHandler))
                 {
-                    //keep receiving connections
-                    SSPClient client = serverProperties.GetNewClient();
-                    client.Handle = e.AcceptSocket;
-                    client.Connection = new Connection(client);
-                    client.RemoteIp = ((IPEndPoint)e.AcceptSocket.RemoteEndPoint).Address.ToString();
-                    client.Connection.ClientId = randomDecimal.NextDecimal();//new Random(DateTime.Now.Millisecond).Next(0, 1000); //tempId++;//
-                    client.ServerAllowsReconnecting = client.ReconnectAtDisconnect;
-                    client.Server = this;
-                    client.Connection.State = ConnectionState.Open;
-
-                    lock(Clients)
+                    lock (Clients)
                     {
-                        while(Clients.ContainsKey(client.ClientId))
-                            client.Connection.ClientId = randomDecimal.NextDecimal();
-                        Clients.Add(client.ClientId, client);
+                        if (Clients.ContainsKey(client.ClientId))
+                            Clients.Remove(client.ClientId);
                     }
-
-                    //accept new client
-                    e.AcceptSocket = null;
-                    if (!this.TcpServer.AcceptAsync(this.asyncSocket))
-                        AsyncAction(null, this.asyncSocket);
-
-                    try
-                    {
-                        if (!client.ServerHandshake(serverProperties, this.UdpServer, GetClients, KeyHandler))
-                        {
-                            lock (Clients)
-                            {
-                                if (Clients.ContainsKey(client.ClientId))
-                                    Clients.Remove(client.ClientId);
-                            }
-                            client.Disconnect(DisconnectReason.HandShakeFailed);
-                            return;
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        onException(ex);
-                        client.Disconnect(DisconnectReason.HandShakeFailed);
-                        return;
-                    }
-
-                    try
-                    {
-                        client.onShareClasses();
-                    }
-                    catch (Exception ex)
-                    {
-                        client.onException(ex, ErrorType.UserLand);
-                    }
-
-                    client.StartReceiver();
-
-                    try
-                    {
-                        client.SharedClientRoot = client.GetSharedClass<ISharedClientRoot>("ROOTSOCKET_CLIENT");
-                    }
-                    catch(Exception ex)
-                    {
-                        //the shared class must exist
-                        client.Disconnect();
-                        break;
-                    }
-
-                    if (client.State != ConnectionState.Reconnecting)
-                    {
-                        client.onClientConnect();
-                    }
-                    onConnectionAccept(client);
-                    break;
+                    client.Disconnect(DisconnectReason.HandShakeFailed);
+                    return;
                 }
             }
+            catch(Exception ex)
+            {
+                onException(ex);
+                client.Disconnect(DisconnectReason.HandShakeFailed);
+                return;
+            }
+
+            try
+            {
+                client.onShareClasses();
+            }
+            catch (Exception ex)
+            {
+                client.onException(ex, ErrorType.UserLand);
+            }
+
+            client.StartReceiver();
+
+            try
+            {
+                client.SharedClientRoot = client.GetSharedClass<ISharedClientRoot>("ROOTSOCKET_CLIENT");
+            }
+            catch(Exception ex)
+            {
+                //the shared class must exist
+                client.Disconnect();
+                return;
+            }
+
+            if (client.State != ConnectionState.Reconnecting)
+            {
+                client.onClientConnect();
+            }
+            onConnectionAccept(client);
         }
 
         /// <summary>

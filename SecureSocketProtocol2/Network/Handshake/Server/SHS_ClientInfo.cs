@@ -67,7 +67,7 @@ namespace SecureSocketProtocol2.Network.Handshake.Server
             if (serverProperties.AllowUdp)
             {
                 Client.UdpHandshakeCode = new byte[50];
-                Client.random.NextBytes(Client.UdpHandshakeCode);
+                new Random().NextBytes(Client.UdpHandshakeCode);
             }
 
             Client.Token = new RandomDecimal(DateTime.Now.Millisecond).NextDecimal();

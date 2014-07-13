@@ -172,6 +172,8 @@ namespace SecureSocketProtocol2.Network.Messages
             AddMessage(typeof(MsgExecuteMethod), "LITECODE_EXECUTE_METHOD");
             AddMessage(typeof(MsgExecuteMethodResponse), "LITECODE_EXECUTE_METHOD_RESPONSE");
             AddMessage(typeof(MsgDisposeClass), "LITECODE_DISPOSE_CLASS");
+
+            AddMessage(typeof(MsgGetNextId), "GET_NEXT_RANDOM_ID");
         }
     }
 }

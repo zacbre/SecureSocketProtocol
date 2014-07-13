@@ -92,7 +92,7 @@ namespace Benchmarker
     public class Client : SSPClient
     {
         public Client()
-            : base("127.0.0.1", 539, typeof(ClientChannel), new object[0], new byte[]
+            : base(new ClientProperties("127.0.0.1", 444, typeof(ClientChannel), new object[0], new byte[]
             { //private key, can be any size you want
                 80, 118, 131, 114, 195, 224, 157, 246, 141, 113,
                 186, 243, 77, 151, 247, 84, 70, 172, 112, 115,
@@ -101,13 +101,12 @@ namespace Benchmarker
             }, new Stream[]
             {//key files
                 //new FileStream(@"C:\Users\Anguis\Desktop\lel.png", FileMode.Open, FileAccess.Read, FileShare.Read)
-            },//login
-               "Dergan", "Hunter:)")
-        {
-
-        }
-
-        public override void onReceiveMessage(SecureSocketProtocol2.Network.Messages.IMessage message)
+            
+            },
+            null,
+            30000,
+            //login
+               "Dergan", "Hunter:)"))
         {
 
         }
@@ -118,16 +117,6 @@ namespace Benchmarker
         }
 
         public override void onValidatingComplete()
-        {
-
-        }
-
-        public override void onDisconnect()
-        {
-
-        }
-
-        public override void onDeepPacketInspection(SecureSocketProtocol2.Network.Messages.IMessage message)
         {
 
         }
@@ -151,12 +140,6 @@ namespace Benchmarker
         {
 
         }
-
-        public override void onRegisterMessages(SecureSocketProtocol2.Network.Messages.MessageHandler messageHandler)
-        {
-
-        }
-
         public override bool onVerifyCertificate(CertInfo certificate)
         {
             return true;
@@ -165,11 +148,6 @@ namespace Benchmarker
         public override void onAddProtection(SecureSocketProtocol2.Network.Protections.Protection protection)
         {
 
-        }
-
-        public override uint HeaderTrashCount
-        {
-            get { return 5; }
         }
 
         public override SecureSocketProtocol2.Plugin.IPlugin[] onGetPlugins()
@@ -185,17 +163,7 @@ namespace Benchmarker
             get { return 45532; }
         }
 
-        public override bool onAuthentication(string Username, string Password)
-        {
-            return true;
-        }
-
         public override void onAuthenticated()
-        {
-
-        }
-
-        public override void onReceiveUdpMessage(IMessage message)
         {
 
         }
@@ -204,10 +172,41 @@ namespace Benchmarker
         {
 
         }
+
+        public override void onDisconnect(DisconnectReason Reason)
+        {
+
+        }
+
+        public override void onShareClasses()
+        {
+
+        }
+
+        public override bool onPeerConnectionRequest(SecureSocketProtocol2.Network.RootSocket.RootPeer peer)
+        {
+            return true;
+        }
+
+        public override SecureSocketProtocol2.Network.RootSocket.RootPeer onGetNewPeerObject()
+        {
+            return null;
+        }
+
+        public override uint HeaderJunkCount
+        {
+            get { return 5; }
+        }
     }
 
     public class ClientChannel : Channel
     {
+        public ClientChannel()
+            : base()
+        {
+
+        }
+
         public override void onChannelOpen()
         {
 
@@ -219,6 +218,11 @@ namespace Benchmarker
         }
 
         public override void onReceiveMessage(SecureSocketProtocol2.Network.Messages.IMessage message)
+        {
+
+        }
+
+        public override void onDeepPacketInspection(IMessage message)
         {
 
         }
